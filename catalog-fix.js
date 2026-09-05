@@ -1,4 +1,4 @@
-// SkinForge v16.6 — catalog categories + reliable skin images
+// SkinForge v16.7 — catalog categories + reliable skin images
 (() => {
   const WEAPONS = [
     'AK-47','AUG','AWP','Bayonet','Bowie Knife','Butterfly Knife','Classic Knife','CZ75-Auto',
@@ -88,7 +88,7 @@
         }
       }
       imageHydrated = true;
-      console.log(`SkinForge v16.6: images matched ${matched}/${live.length}`);
+      console.log(`SkinForge v16.7: images matched ${matched}/${live.length}`);
       document.dispatchEvent(new Event('skinforge-images-ready'));
       document.dispatchEvent(new Event('skinforge-live-ready'));
     } catch (e) {
@@ -107,7 +107,12 @@
     }
 
     document.querySelectorAll('#marketTabs .market-tab').forEach(btn => {
-      const map = {'Ножи':'knife','Пистолеты':'pistol','ПП':'smg','Винтовки':'rifle','AWP':'sniper','Снайперские':'sniper'};
+      if (btn.dataset.cat === 'AWP') {
+        delete btn.dataset.cat;
+        btn.dataset.q = 'AWP';
+        return;
+      }
+      const map = {'Ножи':'knife','Пистолеты':'pistol','ПП':'smg','Винтовки':'rifle','Снайперские':'sniper'};
       if (btn.dataset.cat && map[btn.dataset.cat]) btn.dataset.cat = map[btn.dataset.cat];
     });
 
