@@ -1,0 +1,13 @@
+{
+  "name": "skinforge-market-v14",
+  "version": "8.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check app.js && node --check data.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

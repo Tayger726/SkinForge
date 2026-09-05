@@ -1,0 +1,55 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SkinForge Market</title><link rel="stylesheet" href="styles.css?v=140"><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="manifest" href="site.webmanifest"><meta name="theme-color" content="#8061ff"><meta name="description" content="SkinForge — аналитика цен CS2, Skinport LIVE, портфель, арбитраж и уведомления."></head><body>
+<header class="topbar"><div class="shell">
+  <a class="logo" href="index.html">Skin<span>Forge</span></a>
+  <nav><a href="catalog.html">Каталог</a><a href="analytics.html">Аналитика</a><a href="arbitrage.html">Арбитраж</a><a href="calculator.html">Калькулятор</a><a href="portfolio.html">Портфель</a><a href="favorites.html">Избранное</a><a href="alerts.html">Уведомления</a><a href="status.html">Статус</a></nav>
+  <div class="actions"><div class="header-live"><span class="live-dot"></span><span id="refreshCountdown">LIVE</span></div><button class="primary steam-btn" onclick="alert('Steam-вход подключим позже')">Войти через Steam</button></div>
+</div></header>
+
+<main class="shell">
+<section class="hero-v122">
+  <div class="hero-copy">
+    <div class="eyebrow">CS2 MARKET ANALYTICS</div>
+    <h1>Найди скин.<br>Сравни цену.<br><span>Не переплачивай.</span></h1>
+    <p>Реальные цены Skinport, движение рынка, выгодные предложения и твой портфель — в одном месте.</p>
+    <div class="hero-search">
+      <input id="heroSearch" type="search" placeholder="Например: AK-47 Redline FT">
+      <button class="primary" onclick="heroGo()">Найти скин</button>
+    </div>
+    <div class="chips hero-chips">
+      <a class="chip" href="catalog.html?cat=knife">🔪 Ножи</a>
+      <a class="chip" href="catalog.html?cat=rifle">🔫 Винтовки</a>
+      <a class="chip" href="catalog.html?q=AWP">🎯 AWP</a>
+      <a class="chip" href="catalog.html?cat=pistol">🔫 Пистолеты</a>
+    </div>
+  </div>
+
+  <aside class="market-snapshot">
+    <div class="snapshot-top">
+      <div>
+        <div class="snapshot-label">РЫНОК СЕЙЧАС</div>
+        <h3>Skinport LIVE</h3>
+      </div>
+      <span class="status-pill" id="liveStatus">Подключение...</span>
+    </div>
+    <div class="snapshot-grid">
+      <div class="snapshot-stat"><span>Предметов</span><strong id="heroItems">—</strong></div>
+      <div class="snapshot-stat"><span>Средняя цена</span><strong id="heroAvg">—</strong></div>
+      <div class="snapshot-stat"><span>Лучший дисконт</span><strong id="heroDeal">—</strong></div>
+      <div class="snapshot-stat"><span>Обновлено</span><strong id="heroUpdated">—</strong></div>
+    </div>
+    <div class="snapshot-feature" id="heroFeatured">
+      <div class="feature-kicker">ЗАГРУЗКА РЫНКА</div>
+      <strong>Получаем реальные цены Skinport...</strong>
+      <span>Обычно это занимает несколько секунд.</span>
+    </div>
+    <a class="snapshot-link" href="analytics.html">Открыть аналитику рынка →</a>
+  </aside>
+</section>
+
+<section class="section"><div class="section-head"><h2>🔥 Популярные скины</h2><a class="muted" href="catalog.html">Смотреть все →</a></div><div class="cards" id="popular"></div></section>
+<section class="section" id="prices"><div class="section-head"><h2>💰 Лучшие предложения</h2><span class="muted">Skinport LIVE</span></div><div class="split"><div class="panel" id="offers"></div><div class="panel" id="trends"><h3 style="margin-top:0">Движение рынка</h3><div id="trendList"></div></div></div></section>
+<section class="section" id="news"><div class="section-head"><h2>📰 Новости CS2</h2><a class="muted" href="news.html">Все новости →</a></div><div class="news-grid" id="newsGrid"></div></section>
+<section class="cta"><div><h2 style="margin:0 0 6px">🔔 Следи за нужной ценой</h2><div class="muted">Создавай ценовые уведомления на странице нужного скина.</div></div><div><a class="primary" href="alerts.html">Мои уведомления</a></div></section>
+</main>
+<footer class="footer">SkinForge Market v14 • реальные цены Skinport • без реальных платежей</footer>
+<script src="data.js?v=140"></script><script src="app.js?v=140"></script></body></html>

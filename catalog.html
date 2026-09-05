@@ -1,0 +1,26 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Каталог — SkinForge</title><link rel="stylesheet" href="styles.css?v=140"><link rel="icon" href="favicon.svg" type="image/svg+xml"><link rel="manifest" href="site.webmanifest"><meta name="theme-color" content="#8061ff"><meta name="description" content="SkinForge — аналитика цен CS2, Skinport LIVE, портфель, арбитраж и уведомления."></head><body>
+<header class="topbar"><div class="shell"><a class="logo" href="index.html">Skin<span>Forge</span></a><nav><a href="catalog.html">Каталог</a><a href="analytics.html">Аналитика</a><a href="arbitrage.html">Арбитраж</a><a href="calculator.html">Калькулятор</a><a href="portfolio.html">Портфель</a><a href="favorites.html">Избранное</a><a href="alerts.html">Уведомления</a></nav><div class="actions"><a class="ghost" href="index.html">Главная</a></div></div></header>
+<div style="max-width:1180px;margin:12px auto 0;padding:0 20px;color:#8190a5;font:12px Arial">SkinForge v14 • реальные цены Skinport загружаются через локальный backend.</div><main class="shell"><div class="catalog-layout"><aside class="panel filters"><h3 style="margin-top:0">Фильтры</h3><div class="filter-group"><label>Поиск</label><input id="searchInput" placeholder="Название скина"></div><div class="filter-group"><label>Категория</label><select id="category">
+<option value="">Все категории</option>
+<option value="Винтовки">Винтовки</option>
+<option value="AWP">AWP</option>
+<option value="Снайперские">Снайперские</option>
+<option value="Пистолеты">Пистолеты</option>
+<option value="ПП">ПП</option>
+<option value="Ножи">Ножи</option>
+</select><select id="weaponFilter"><option value="">Все оружие</option><option value="AK-47">AK-47</option><option value="AUG">AUG</option><option value="AWP">AWP</option><option value="Bayonet">Bayonet</option><option value="Butterfly Knife">Butterfly Knife</option><option value="Desert Eagle">Desert Eagle</option><option value="FAMAS">FAMAS</option><option value="Five-SeveN">Five-SeveN</option><option value="G3SG1">G3SG1</option><option value="Galil AR">Galil AR</option><option value="Glock-18">Glock-18</option><option value="Karambit">Karambit</option><option value="M4A1-S">M4A1-S</option><option value="M4A4">M4A4</option><option value="M9 Bayonet">M9 Bayonet</option><option value="MAC-10">MAC-10</option><option value="MP7">MP7</option><option value="MP9">MP9</option><option value="P250">P250</option><option value="P90">P90</option><option value="SCAR-20">SCAR-20</option><option value="SG 553">SG 553</option><option value="SSG 08">SSG 08</option><option value="Skeleton Knife">Skeleton Knife</option><option value="Talon Knife">Talon Knife</option><option value="Tec-9">Tec-9</option><option value="UMP-45">UMP-45</option><option value="USP-S">USP-S</option><option value="Ursus Knife">Ursus Knife</option></select>
+<select id="conditionFilter">
+<option value="">Любой износ</option>
+<option value="Factory New">Factory New (FN)</option>
+<option value="Minimal Wear">Minimal Wear (MW)</option>
+<option value="Field-Tested">Field-Tested (FT)</option>
+<option value="Well-Worn">Well-Worn (WW)</option>
+<option value="Battle-Scarred">Battle-Scarred (BS)</option>
+</select>
+<select id="stattrakFilter">
+<option value="all">Обычные + StatTrak</option>
+<option value="yes">Только StatTrak</option>
+<option value="no">Без StatTrak</option>
+</select>
+</div><div class="filter-group"><label>Цена от</label><input id="minPrice" type="number" placeholder="0"></div><div class="filter-group"><label>Цена до</label><input id="maxPrice" type="number" placeholder="1000"></div><div class="filter-group"><label>Сортировка</label><select id="sort"><option value="">По умолчанию</option><option value="low">Сначала дешёвые</option><option value="high">Сначала дорогие</option><option value="rise">Сильнее растут</option><option value="fall">Сильнее падают</option></select></div><label style="display:flex;gap:9px;align-items:center;color:#b8c0ce"><input id="onlyFav" type="checkbox" style="width:auto"> Только избранное</label><label class="check"><input type="checkbox" id="liveOnly" checked> Только реальные Skinport</label></aside><section><div class="section-head"><h2>Каталог скинов</h2><span class="muted" id="resultCount"></span></div><div class="results" id="catalogGrid"></div></section></div><div id="pager" class="pager"></div></main>
+<footer class="footer">SkinForge Market</footer><script src="data.js?v=140"></script><script src="app.js?v=140"></script><script>addEventListener('DOMContentLoaded',()=>{let p=new URLSearchParams(location.search);if(p.get('cat')){document.getElementById('category').value=p.get('cat');document.getElementById('category').dispatchEvent(new Event('input'))}if(p.get('fav')){document.getElementById('onlyFav').checked=true;document.getElementById('onlyFav').dispatchEvent(new Event('change'))}})</script></body></html>
