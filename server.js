@@ -1,251 +1,29 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const zlib = require('zlib');
+const crypto = require('crypto');
 const { URL } = require('url');
-
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const HOST = process.env.HOST || '0.0.0.0';
-const PORT = Number(process.env.PORT || 3000);
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
-
-function log(level, message, meta={}) {
-  const levels = {error:0,warn:1,info:2,debug:3};
-  if ((levels[level] ?? 2) > (levels[LOG_LEVEL] ?? 2)) return;
-  const row = {time:new Date().toISOString(), level, message, ...meta};
-  console.log(JSON.stringify(row));
-}
-
-function applySecurityHeaders(res) {
-  res.setHeader('X-Content-Type-Options','nosniff');
-  res.setHeader('X-Frame-Options','SAMEORIGIN');
-  res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');
-  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
-  res.setHeader('Cross-Origin-Resource-Policy','cross-origin');
-  res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
-  res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers','Content-Type');
-  if (NODE_ENV === 'production') {
-    res.setHeader('Strict-Transport-Security','max-age=15552000; includeSubDomains');
-  }
-}
-
-
-
-const ROOT = __dirname;
-const CACHE_MS = 5 * 60 * 1000;
-const cache = new Map();
-const skinforgeDiagnostics = {
-  started_at: new Date().toISOString(),
-  skinport: { ok: null, last_success: null, last_error: null, item_count: 0 },
-  steam: { ok: null, last_success: null, last_error: null }
-};
-let lastGoodItems = null;
-let lastGoodItemsAt = null;
-
-function send(res, status, body, type='application/json; charset=utf-8') {
-  res.writeHead(status, {'Content-Type': type, 'Cache-Control': 'no-store'});
-  res.end(body);
-}
-function json(res, status, data) { send(res, status, JSON.stringify(data)); }
-
-async function skinportFetch(endpoint, params={}) {
-  const u = new URL('https://api.skinport.com' + endpoint);
-  u.searchParams.set('app_id', '730');
-  u.searchParams.set('currency', 'USD');
-  Object.entries(params).forEach(([k,v]) => {
-    if (v !== undefined && v !== null && v !== '') u.searchParams.set(k, v);
-  });
-
-  const key = u.toString();
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.time < CACHE_MS) return hit.data;
-
-  const response = await fetch(u, {
-    headers: {
-      'Accept': 'application/json',
-      'Accept-Encoding': 'br'
-    }
-  });
-  if (!response.ok) throw new Error(`Skinport HTTP ${response.status}`);
-  const data = await response.json();
-  cache.set(key, {time: Date.now(), data});
-  if (endpoint.includes('/v1/items') && Array.isArray(data)) {
-      lastGoodItems = data;
-      lastGoodItemsAt = new Date().toISOString();
-      skinforgeDiagnostics.skinport.ok = true;
-      skinforgeDiagnostics.skinport.last_success = lastGoodItemsAt;
-      skinforgeDiagnostics.skinport.last_error = null;
-      skinforgeDiagnostics.skinport.item_count = data.length;
-    }
-    return data;
-}
-
-
-function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
-
-function parseSteamMoney(v){
-  if(!v) return null;
-  const cleaned=String(v).replace(/[^0-9.,]/g,'').replace(/,/g,'');
-  const n=parseFloat(cleaned);
-  return Number.isFinite(n)?n:null;
-}
-
-async function steamPrice(name){
-  const key='steam:'+name;
-  const hit=cache.get(key);
-  if(hit && Date.now()-hit.time < 10*60*1000) return hit.data;
-
-  const u=new URL('https://steamcommunity.com/market/priceoverview/');
-  u.searchParams.set('appid','730');
-  u.searchParams.set('currency','1');
-  u.searchParams.set('country','US');
-  u.searchParams.set('market_hash_name',name);
-
-  const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0','Accept':'application/json'}});
-  if(!r.ok) throw new Error(`Steam HTTP ${r.status}`);
-  const raw=await r.json();
-  const data={
-    success:!!raw.success,
-    lowest_price:parseSteamMoney(raw.lowest_price),
-    median_price:parseSteamMoney(raw.median_price),
-    volume:raw.volume||null,
-    raw
-  };
-  cache.set(key,{time:Date.now(),data});
-  skinforgeDiagnostics.steam.ok=!!data.success;
-  skinforgeDiagnostics.steam.last_success=new Date().toISOString();
-  skinforgeDiagnostics.steam.last_error=null;
-  return data;
-}
-
-async function api(req, res, u) {
-  try {
-    if (u.pathname === '/api/ready') {
-      return json(res, 200, {
-        ok:true,
-        service:'SkinForge v14',
-        ready:true,
-        skinport_cached:Array.isArray(lastGoodItems),
-        timestamp:new Date().toISOString()
-      });
-    }
-
-    if (u.pathname === '/api/health') {
-      return json(res, 200, {ok:true, service:'SkinForge v14', env:NODE_ENV, uptime_sec:Math.floor(process.uptime())});
-    }
-
-    if (u.pathname === '/api/status') {
-      return json(res, 200, {
-        ok:true,
-        service:'SkinForge v14',
-        uptime_sec:Math.floor(process.uptime()),
-        now:new Date().toISOString(),
-        node:process.version,
-        skinport:skinforgeDiagnostics.skinport,
-        steam:skinforgeDiagnostics.steam,
-        cache:{
-          has_last_good_items:Array.isArray(lastGoodItems),
-          last_good_items_at:lastGoodItemsAt,
-          last_good_item_count:Array.isArray(lastGoodItems)?lastGoodItems.length:0
-        }
-      });
-    }
-
-    if (u.pathname === '/api/items-last-good') {
-      if (Array.isArray(lastGoodItems)) {
-        res.setHeader('X-SkinForge-Cache','last-good');
-        return json(res,200,lastGoodItems);
-      }
-      return json(res,503,{error:'No successful Skinport snapshot cached yet'});
-    }
-
-    if (u.pathname === '/api/items') {
-      let all;
-      try {
-        all = await skinportFetch('/v1/items', {tradable:'1'});
-      } catch (e) {
-        skinforgeDiagnostics.skinport.ok=false;
-        skinforgeDiagnostics.skinport.last_error=String(e.message||e);
-        if (!Array.isArray(lastGoodItems)) throw e;
-        all=lastGoodItems;
-        res.setHeader('X-SkinForge-Fallback','last-good');
-      }
-      const names = (u.searchParams.get('names') || '').split('|').filter(Boolean);
-      if (!names.length) return json(res, 200, all);
-      const wanted = new Set(names);
-      return json(res, 200, all.filter(x => wanted.has(x.market_hash_name)));
-    }
-
-
-
-    if (u.pathname === '/api/steam-batch') {
-      const raw=(u.searchParams.get('names')||'').split('|').filter(Boolean).slice(0,8);
-      if(!raw.length) return json(res,400,{error:'names is required'});
-      const out=[];
-      for (let i=0;i<raw.length;i++){
-        const name=raw[i];
-        try{
-          const d=await steamPrice(name);
-          out.push({name,...d});
-        }catch(e){
-          out.push({name,error:String(e.message||e)});
-        }
-        if(i<raw.length-1) await sleep(650);
-      }
-      return json(res,200,out);
-    }
-
-    if (u.pathname === '/api/steam') {
-      const name=u.searchParams.get('name');
-      if(!name) return json(res,400,{error:'name is required'});
-      const data=await steamPrice(name);
-      return json(res,200,data);
-    }
-
-    if (u.pathname === '/api/history') {
-      // Получаем общую историю одним запросом и фильтруем уже на фронтенде.
-      // Это надёжнее, чем передавать сразу много market_hash_name.
-      const data = await skinportFetch('/v1/sales/history');
-      return json(res, 200, data);
-    }
-
-    json(res, 404, {error:'API endpoint not found'});
-  } catch (err) {
-    json(res, 502, {error:'Skinport request failed', detail:String(err.message || err)});
-  }
-}
-
-function serveStatic(req, res, u) {
-  let rel = decodeURIComponent(u.pathname);
-  if (rel === '/') rel = '/index.html';
-  const file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT)) return send(res,403,'Forbidden','text/plain');
-
-  fs.readFile(file, (err, buf) => {
-    if (err) return send(res,404,'Not found','text/plain');
-    const ext = path.extname(file).toLowerCase();
-    const types = {
-      '.html':'text/html; charset=utf-8',
-      '.js':'application/javascript; charset=utf-8',
-      '.css':'text/css; charset=utf-8',
-      '.svg':'image/svg+xml',
-      '.png':'image/png',
-      '.jpg':'image/jpeg',
-      '.jpeg':'image/jpeg',
-      '.webp':'image/webp',
-      '.txt':'text/plain; charset=utf-8'
-    };
-    send(res,200,buf,types[ext] || 'application/octet-stream');
-  });
-}
-
-http.createServer(async (req,res) => {
-  applySecurityHeaders(res);
-  const reqStarted=Date.now();
-  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
-  const u = new URL(req.url, `http://${req.headers.host}`);
-  if (u.pathname.startsWith('/api/')) return api(req,res,u);
-  return serveStatic(req,res,u);
-}).listen(PORT, HOST, () => { log('info','SkinForge started',{url:`http://${HOST}:${PORT}`,env:NODE_ENV}); });
+const NODE_ENV=process.env.NODE_ENV||'development', HOST=process.env.HOST||'0.0.0.0', PORT=Number(process.env.PORT||3000), ALLOWED_ORIGIN=process.env.ALLOWED_ORIGIN||'*', LOG_LEVEL=process.env.LOG_LEVEL||'info';
+const SESSION_SECRET=process.env.SESSION_SECRET||'skinforge-dev-change-me', STEAM_API_KEY=process.env.STEAM_API_KEY||'', STEAM_OPENID='https://steamcommunity.com/openid/login';
+const ROOT=__dirname,CACHE_MS=5*60*1000,cache=new Map(); let lastGoodItems=null,lastGoodItemsAt=null;
+const diag={started_at:new Date().toISOString(),skinport:{ok:null,last_success:null,last_error:null,item_count:0},steam:{ok:null,last_success:null,last_error:null}};
+function log(level,message,meta={}){const l={error:0,warn:1,info:2,debug:3};if((l[level]??2)>(l[LOG_LEVEL]??2))return;console.log(JSON.stringify({time:new Date().toISOString(),level,message,...meta}))}
+function headers(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('X-Frame-Options','SAMEORIGIN');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Access-Control-Allow-Origin',ALLOWED_ORIGIN);if(NODE_ENV==='production')res.setHeader('Strict-Transport-Security','max-age=15552000; includeSubDomains')}
+function send(res,status,body,type='application/json; charset=utf-8'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store'});res.end(body)} function json(res,s,d){send(res,s,JSON.stringify(d))}
+function origin(req){return `${String(req.headers['x-forwarded-proto']||'http').split(',')[0].trim()}://${req.headers.host}`}
+function hmac(v){return crypto.createHmac('sha256',SESSION_SECRET).update(String(v)).digest('hex')} function eq(a,b){const A=Buffer.from(String(a||'')),B=Buffer.from(String(b||''));return A.length===B.length&&crypto.timingSafeEqual(A,B)}
+function state(){const t=Date.now().toString();return `${t}.${hmac('state:'+t)}`} function stateOK(v){const [t,s]=String(v||'').split('.'),age=Date.now()-Number(t);return !!t&&!!s&&eq(s,hmac('state:'+t))&&age>=0&&age<600000}
+function cookies(req){return Object.fromEntries(String(req.headers.cookie||'').split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return[decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}))}
+function steamId(req){const x=cookies(req).sf_session||'',i=x.lastIndexOf('.');if(i<1)return null;const id=x.slice(0,i),sig=x.slice(i+1);return /^\d{17}$/.test(id)&&eq(sig,hmac('session:'+id))?id:null}
+function setSession(res,id){res.setHeader('Set-Cookie',`sf_session=${id}.${hmac('session:'+id)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000${NODE_ENV==='production'?'; Secure':''}`)} function logout(res){res.setHeader('Set-Cookie',`sf_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${NODE_ENV==='production'?'; Secure':''}`)}
+async function verifySteam(p){const b=new URLSearchParams();for(const[k,v]of p.entries())if(k.startsWith('openid.'))b.set(k,v);b.set('openid.mode','check_authentication');const r=await fetch(STEAM_OPENID,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','User-Agent':'SkinForge/15'},body:b});return r.ok&&/is_valid:true/i.test(await r.text())}
+async function profile(id){if(!STEAM_API_KEY)return{steamid:id,personaname:`Steam ${id.slice(-6)}`,profileurl:`https://steamcommunity.com/profiles/${id}/`,avatarfull:null};const u=new URL('https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/');u.searchParams.set('key',STEAM_API_KEY);u.searchParams.set('steamids',id);const r=await fetch(u);if(!r.ok)throw Error(`Steam Web API ${r.status}`);const d=await r.json();return d?.response?.players?.[0]||{steamid:id}}
+async function skinport(endpoint,params={}){const u=new URL('https://api.skinport.com'+endpoint);u.searchParams.set('app_id','730');u.searchParams.set('currency','USD');Object.entries(params).forEach(([k,v])=>v!==''&&u.searchParams.set(k,v));const k=u.toString(),hit=cache.get(k);if(hit&&Date.now()-hit.time<CACHE_MS)return hit.data;const r=await fetch(u,{headers:{Accept:'application/json','Accept-Encoding':'br'}});if(!r.ok)throw Error(`Skinport HTTP ${r.status}`);const d=await r.json();cache.set(k,{time:Date.now(),data:d});if(endpoint.includes('/v1/items')&&Array.isArray(d)){lastGoodItems=d;lastGoodItemsAt=new Date().toISOString();Object.assign(diag.skinport,{ok:true,last_success:lastGoodItemsAt,last_error:null,item_count:d.length})}return d}
+function money(v){if(!v)return null;const n=parseFloat(String(v).replace(/[^0-9.,]/g,'').replace(/,/g,''));return Number.isFinite(n)?n:null}
+async function steamPrice(name){const u=new URL('https://steamcommunity.com/market/priceoverview/');u.searchParams.set('appid','730');u.searchParams.set('currency','1');u.searchParams.set('country','US');u.searchParams.set('market_hash_name',name);const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0',Accept:'application/json'}});if(!r.ok)throw Error(`Steam HTTP ${r.status}`);const x=await r.json();return{success:!!x.success,lowest_price:money(x.lowest_price),median_price:money(x.median_price),volume:x.volume||null,raw:x}}
+async function api(req,res,u){try{if(u.pathname==='/api/me'){const id=steamId(req);if(!id)return json(res,200,{authenticated:false});try{return json(res,200,{authenticated:true,profile:await profile(id),has_api_key:!!STEAM_API_KEY})}catch(e){return json(res,200,{authenticated:true,profile:{steamid:id,personaname:`Steam ${id.slice(-6)}`,profileurl:`https://steamcommunity.com/profiles/${id}/`},profile_error:String(e.message||e)})}}
+if(u.pathname==='/api/ready')return json(res,200,{ok:true,service:'SkinForge v15',ready:true,skinport_cached:Array.isArray(lastGoodItems),timestamp:new Date().toISOString()});if(u.pathname==='/api/health')return json(res,200,{ok:true,service:'SkinForge v15',env:NODE_ENV,uptime_sec:Math.floor(process.uptime())});if(u.pathname==='/api/status')return json(res,200,{ok:true,service:'SkinForge v15',uptime_sec:Math.floor(process.uptime()),now:new Date().toISOString(),node:process.version,skinport:diag.skinport,steam:diag.steam,cache:{has_last_good_items:Array.isArray(lastGoodItems),last_good_items_at:lastGoodItemsAt,last_good_item_count:Array.isArray(lastGoodItems)?lastGoodItems.length:0}});
+if(u.pathname==='/api/items-last-good')return Array.isArray(lastGoodItems)?json(res,200,lastGoodItems):json(res,503,{error:'No successful Skinport snapshot cached yet'});if(u.pathname==='/api/items'){let all;try{all=await skinport('/v1/items',{tradable:'1'})}catch(e){diag.skinport.ok=false;diag.skinport.last_error=String(e.message||e);if(!Array.isArray(lastGoodItems))throw e;all=lastGoodItems}const names=(u.searchParams.get('names')||'').split('|').filter(Boolean);return json(res,200,names.length?all.filter(x=>new Set(names).has(x.market_hash_name)):all)}
+if(u.pathname==='/api/steam'){const name=u.searchParams.get('name');return name?json(res,200,await steamPrice(name)):json(res,400,{error:'name is required'})}if(u.pathname==='/api/steam-batch'){const names=(u.searchParams.get('names')||'').split('|').filter(Boolean).slice(0,8),out=[];for(const name of names){try{out.push({name,...await steamPrice(name)})}catch(e){out.push({name,error:String(e.message||e)})}}return json(res,200,out)}if(u.pathname==='/api/history')return json(res,200,await skinport('/v1/sales/history'));return json(res,404,{error:'API endpoint not found'})}catch(e){return json(res,502,{error:'Upstream request failed',detail:String(e.message||e)})}}
+function staticFile(res,u){let rel=decodeURIComponent(u.pathname);if(rel==='/')rel='/index.html';const f=path.normalize(path.join(ROOT,rel));if(!f.startsWith(ROOT))return send(res,403,'Forbidden','text/plain');fs.readFile(f,(e,b)=>{if(e)return send(res,404,'Not found','text/plain');const t={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.webp':'image/webp','.txt':'text/plain; charset=utf-8'};send(res,200,b,t[path.extname(f).toLowerCase()]||'application/octet-stream')})}
+http.createServer(async(req,res)=>{headers(res);if(req.method==='OPTIONS'){res.writeHead(204);return res.end()}const u=new URL(req.url,`http://${req.headers.host}`);if(u.pathname==='/auth/steam'){const o=origin(req),st=state(),ret=new URL('/auth/steam/callback',o);ret.searchParams.set('state',st);const p=new URLSearchParams({'openid.ns':'http://specs.openid.net/auth/2.0','openid.mode':'checkid_setup','openid.return_to':ret.toString(),'openid.realm':o+'/','openid.identity':'http://specs.openid.net/auth/2.0/identifier_select','openid.claimed_id':'http://specs.openid.net/auth/2.0/identifier_select'});res.writeHead(302,{Location:`${STEAM_OPENID}?${p}`});return res.end()}if(u.pathname==='/auth/steam/callback'){try{if(!stateOK(u.searchParams.get('state'))||u.searchParams.get('openid.mode')!=='id_res'||!await verifySteam(u.searchParams))throw Error('Steam verification failed');const m=(u.searchParams.get('openid.claimed_id')||'').match(/steamcommunity\.com\/openid\/id\/(\d{17})/);if(!m)throw Error('SteamID missing');setSession(res,m[1]);res.writeHead(302,{Location:'/?steam=ok'});return res.end()}catch(e){log('warn','Steam login failed',{error:String(e.message||e)});res.writeHead(302,{Location:'/?steam=error'});return res.end()}}if(u.pathname==='/auth/logout'){logout(res);res.writeHead(302,{Location:'/'});return res.end()}if(u.pathname.startsWith('/api/'))return api(req,res,u);return staticFile(res,u)}).listen(PORT,HOST,()=>log('info','SkinForge started',{url:`http://${HOST}:${PORT}`,env:NODE_ENV}));
