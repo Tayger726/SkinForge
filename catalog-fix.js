@@ -1,4 +1,4 @@
-// SkinForge v16.1 — catalog cleanup
+// SkinForge v16.5 — catalog category + live skin fix
 (() => {
   const WEAPONS = [
     'AK-47','AUG','AWP','Bayonet','Bowie Knife','Butterfly Knife','Classic Knife','CZ75-Auto',
@@ -7,7 +7,8 @@
     'MAG-7','MP5-SD','MP7','MP9','Navaja Knife','Negev','Nomad Knife','Nova','P2000','P250',
     'P90','Paracord Knife','PP-Bizon','R8 Revolver','Sawed-Off','SCAR-20','SG 553','Shadow Daggers',
     'Skeleton Knife','SSG 08','Stiletto Knife','Survival Knife','Talon Knife','Tec-9','UMP-45',
-    'Ursus Knife','USP-S','XM1014'
+    'Ursus Knife','USP-S','XM1014','Bloodhound Gloves','Broken Fang Gloves','Driver Gloves','Hand Wraps',
+    'Hydra Gloves','Moto Gloves','Specialist Gloves','Sport Gloves'
   ];
   const WEAPON_SET = new Set(WEAPONS.map(x => x.toLowerCase()));
 
@@ -21,10 +22,8 @@
     if (/charm\s*\|/.test(n)) return 'charm';
     if (/music kit\s*\|/.test(n)) return 'music';
     if (/graffiti\s*\|/.test(n)) return 'graffiti';
-    if (/agent\s*\|/.test(n)) return 'agent';
-
-    const cleaned = raw.replace(/^StatTrak™\s*/i,'').replace(/^Souvenir\s+/i,'').trim();
-    const weapon = cleaned.split('|')[0].trim().replace(/^★\s*/,'');
+    const cleaned = raw.replace(/^Souvenir\s+/i,'').replace(/^StatTrak™\s*/i,'').replace(/^★\s*/,'').trim();
+    const weapon = cleaned.split('|')[0].trim();
     return WEAPON_SET.has(weapon.toLowerCase()) ? 'skin' : 'other';
   };
 
@@ -33,15 +32,27 @@
     if (!Number.isFinite(Number(s.price)) || Number(s.price) <= 0) return false;
     if (!s.weapon || !s.finish) return false;
     const weapon = String(s.weapon).replace(/^★\s*/,'').trim().toLowerCase();
-    if (!WEAPON_SET.has(weapon)) return false;
-    return true;
+    return WEAPON_SET.has(weapon);
   };
 
-  // Hide broken image icons cleanly instead of showing an empty/broken symbol.
+  document.addEventListener('DOMContentLoaded', () => {
+    const category = document.getElementById('category');
+    if (category) {
+      const map = {'Винтовки':'rifle','AWP':'sniper','Снайперские':'sniper','Пистолеты':'pistol','ПП':'smg','Ножи':'knife'};
+      [...category.options].forEach(o => { if (map[o.value]) o.value = map[o.value]; });
+      if (map[category.value]) category.value = map[category.value];
+    }
+
+    document.querySelectorAll('#marketTabs .market-tab').forEach(btn => {
+      const map = {'Ножи':'knife','Пистолеты':'pistol','ПП':'smg','Винтовки':'rifle','AWP':'sniper','Снайперские':'sniper'};
+      if (btn.dataset.cat && map[btn.dataset.cat]) btn.dataset.cat = map[btn.dataset.cat];
+    });
+
+    if (category) category.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+
   document.addEventListener('error', e => {
     const img = e.target;
-    if (img && img.tagName === 'IMG' && img.closest('.skin-card,.card,.result-card')) {
-      img.style.opacity = '0';
-    }
+    if (img && img.tagName === 'IMG' && img.closest('.skin-card,.card,.result-card')) img.style.opacity = '0';
   }, true);
 })();
