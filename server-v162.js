@@ -4,6 +4,7 @@ const {Pool}=require('pg');
 
 const DATABASE_URL=process.env.DATABASE_URL||'';
 const SESSION_SECRET=process.env.SESSION_SECRET||'skinforge-dev-change-me';
+const ADMIN_BOOTSTRAP_TOKEN=process.env.ADMIN_BOOTSTRAP_TOKEN||'';
 let db=null,dbReady=null;
 
 function hmac(v){return crypto.createHmac('sha256',SESSION_SECRET).update(String(v)).digest('hex')}
@@ -28,11 +29,17 @@ async function ensureDb(){
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+    await db.query(`CREATE TABLE IF NOT EXISTS admin_users(
+      steamid TEXT PRIMARY KEY,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
     await db.query('CREATE INDEX IF NOT EXISTS support_tickets_steamid_created_idx ON support_tickets(steamid,created_at DESC)');
+    await db.query('CREATE INDEX IF NOT EXISTS support_tickets_status_created_idx ON support_tickets(status,created_at DESC)');
     return true;
   })().catch(e=>{dbReady=null;throw e});
   return dbReady;
 }
+async function isAdmin(id){if(!id)return false;await ensureDb();const r=await db.query('SELECT 1 FROM admin_users WHERE steamid=$1',[id]);return !!r.rows.length}
 async function supportApi(req,res){
   const id=steamId(req);
   if(!id)return json(res,401,{error:'Steam login required'});
@@ -61,6 +68,51 @@ async function supportApi(req,res){
     return json(res,500,{error:'Не удалось обработать обращение'});
   }
 }
+async function adminApi(req,res,u){
+  const id=steamId(req);
+  if(!id)return json(res,401,{error:'Steam login required'});
+  try{
+    await ensureDb();
+    if(u.pathname==='/api/admin/claim'){
+      if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
+      const admins=await db.query('SELECT COUNT(*)::int AS count FROM admin_users');
+      if(Number(admins.rows[0]?.count||0)>0)return json(res,409,{error:'Администратор уже назначен'});
+      const b=await body(req),token=String(b.token||'');
+      if(!ADMIN_BOOTSTRAP_TOKEN||!eq(hmac('bootstrap:'+token),hmac('bootstrap:'+ADMIN_BOOTSTRAP_TOKEN)))return json(res,403,{error:'Неверный код администратора'});
+      await db.query('INSERT INTO admin_users(steamid) VALUES($1) ON CONFLICT DO NOTHING',[id]);
+      return json(res,200,{ok:true,admin:true});
+    }
+    if(!(await isAdmin(id)))return json(res,403,{error:'Admin access required'});
+    if(u.pathname==='/api/admin/me')return json(res,200,{ok:true,admin:true,steamid:id});
+    if(u.pathname==='/api/admin/tickets'&&req.method==='GET'){
+      const status=String(u.searchParams.get('status')||'all');
+      const q=String(u.searchParams.get('q')||'').trim();
+      const vals=[];let where=[];
+      if(['open','answered','closed'].includes(status)){vals.push(status);where.push(`status=$${vals.length}`)}
+      if(q){vals.push('%'+q+'%');where.push(`(subject ILIKE $${vals.length} OR message ILIKE $${vals.length} OR steamid ILIKE $${vals.length})`)}
+      vals.push(200);
+      const sql=`SELECT id,steamid,category,subject,message,status,reply,created_at,updated_at FROM support_tickets ${where.length?'WHERE '+where.join(' AND '):''} ORDER BY CASE WHEN status='open' THEN 0 WHEN status='answered' THEN 1 ELSE 2 END, created_at DESC LIMIT $${vals.length}`;
+      const r=await db.query(sql,vals);
+      return json(res,200,{ok:true,tickets:r.rows});
+    }
+    const m=u.pathname.match(/^\/api\/admin\/tickets\/(\d+)$/);
+    if(m&&(req.method==='PUT'||req.method==='POST')){
+      const ticketId=Number(m[1]);
+      const b=await body(req);
+      const allowed=new Set(['open','answered','closed']);
+      const status=allowed.has(String(b.status||''))?String(b.status):null;
+      const reply=String(b.reply??'').trim().slice(0,5000);
+      if(!status)return json(res,400,{error:'Неверный статус'});
+      const r=await db.query('UPDATE support_tickets SET status=$1,reply=$2,updated_at=NOW() WHERE id=$3 RETURNING id,steamid,category,subject,message,status,reply,created_at,updated_at',[status,reply||null,ticketId]);
+      if(!r.rows.length)return json(res,404,{error:'Обращение не найдено'});
+      return json(res,200,{ok:true,ticket:r.rows[0]});
+    }
+    return json(res,404,{error:'Admin endpoint not found'});
+  }catch(e){
+    console.error(JSON.stringify({level:'error',message:'Admin support API error',error:String(e.message||e)}));
+    return json(res,500,{error:'Ошибка админ-панели'});
+  }
+}
 
 const originalCreateServer=http.createServer.bind(http);
 http.createServer=function(listener){
@@ -68,6 +120,7 @@ http.createServer=function(listener){
     try{
       const u=new URL(req.url,`http://${req.headers.host||'localhost'}`);
       if(u.pathname==='/api/support/tickets')return supportApi(req,res);
+      if(u.pathname.startsWith('/api/admin/'))return adminApi(req,res,u);
 
       const originalEnd=res.end.bind(res);
       res.end=function(chunk,encoding,cb){
@@ -75,7 +128,7 @@ http.createServer=function(listener){
           const ct=String(res.getHeader('Content-Type')||'');
           if(chunk&&(ct.includes('text/html')||ct.includes('application/json'))){
             let text=Buffer.isBuffer(chunk)?chunk.toString('utf8'):String(chunk);
-            text=text.replace(/SkinForge v16\.1/g,'SkinForge v16.2');
+            text=text.replace(/SkinForge v16\.1/g,'SkinForge v16.3').replace(/SkinForge v16\.2/g,'SkinForge v16.3');
             if(ct.includes('text/html')&&!text.includes('href="support.html"')&&!text.includes("href='support.html'")){
               text=text.replace(/<\/nav>/i,'<a href="support.html">Поддержка</a></nav>');
             }
@@ -91,5 +144,5 @@ http.createServer=function(listener){
   });
 };
 
-ensureDb().then(()=>console.log(JSON.stringify({level:'info',message:'Support database ready'}))).catch(e=>console.error(JSON.stringify({level:'error',message:'Support database unavailable',error:String(e.message||e)})));
+ensureDb().then(()=>console.log(JSON.stringify({level:'info',message:'Support/admin database ready'}))).catch(e=>console.error(JSON.stringify({level:'error',message:'Support database unavailable',error:String(e.message||e)})));
 require('./server-v16.js');
