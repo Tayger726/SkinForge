@@ -3,9 +3,9 @@
   "version": "10.0.0",
   "private": true,
   "scripts": {
-    "start": "node server-v16.js",
-    "dev": "node server-v16.js",
-    "check": "node --check server-v16.js && node --check app.js && node --check data.js && node --check cloud.js"
+    "start": "node server-v17.js",
+    "dev": "node server-v17.js",
+    "check": "node --check server-v17.js && node --check app.js && node --check data.js && node --check cloud.js"
   },
   "engines": {
     "node": ">=18"
