@@ -127,21 +127,29 @@ function trendFromHistory(h){
 }
 
 function dealScore(s,feePct=8){
-  const reference=[s.mean,s.median,s.suggested].find(v=>Number.isFinite(v)&&v>0)||s.price||0;
-  const discount=reference>0&&s.price>0?Math.max(0,(reference-s.price)/reference*100):0;
+  const price=Number(s.price||0), suggested=Number(s.suggested||0);
+  // Mean/median can be distorted by rare floats and stickered listings. Skinport's
+  // suggested price is the safer like-for-like reference for an uninspected item.
+  const reference=Number.isFinite(suggested)&&suggested>0?suggested:price;
+  const discount=reference>0&&price>0?Math.max(-30,Math.min(40,(reference-price)/reference*100)):0;
   const liquidity=Math.min(25,Math.log10(Math.max(1,s.quantity||0)+1)*9);
-  const swing=Math.min(30,Math.abs(Number(s.trend7)||0));
+  const swing=Math.min(25,Math.abs(Number(s.trend7)||0));
   const dataBonus=s.history?10:4;
-  const score=Math.round(Math.max(0,Math.min(100,discount*2.1+liquidity+dataBonus+20-swing*1.5)));
-  const gross=reference*(1-feePct/100)-Number(s.price||0);
-  const lockReserve=Number(s.price||0)*Math.min(.25,swing/100);
+  const stability=Math.max(0,20-swing*1.5);
+  const gross=reference*(1-feePct/100)-price;
+  // Even without history, reserve at least 5%: the item cannot be immediately
+  // transferred again and its exit price is unknown for the lock period.
+  const lockRiskPct=Math.min(25,Math.max(5,swing));
+  const lockReserve=price*lockRiskPct/100;
   const afterLock=gross-lockReserve;
-  const risk=swing>=10||(s.quantity||0)<10?'Высокий':swing>=5||(s.quantity||0)<40?'Средний':'Низкий';
-  const verdict=score>=72&&afterLock>0?'Выгодно':score>=50?'Наблюдать':'Рискованно';
+  const valueBonus=Math.min(10,Math.log10(1+Math.max(0,afterLock))*6);
+  const score=Math.round(Math.max(0,Math.min(100,discount*.8+liquidity+dataBonus+stability+valueBonus)));
+  const risk=swing>=10||(s.quantity||0)<10?'Высокий':swing>=5||(s.quantity||0)<40||!s.history?'Средний':'Низкий';
+  const verdict=score>=72&&afterLock>0?'Выгодно':score>=50&&afterLock>0?'Наблюдать':'Рискованно';
   return {score,reference,discount,liquidity:Math.round(liquidity),swing,risk,gross,lockReserve,afterLock,verdict,feePct};
 }
 function scoreClass(m){return m.score>=72?'score-good':m.score>=50?'score-watch':'score-risk'}
-function scoreBadge(s){const m=dealScore(s);return `<span class="deal-score ${scoreClass(m)}" title="Учитывает цену, ликвидность, движение рынка, комиссию ${m.feePct}% и риск 7-дневной блокировки">SF ${m.score}/100 · ${m.verdict}</span>`}
+function scoreBadge(s,feePct=8){const m=dealScore(s,feePct);return `<span class="deal-score ${scoreClass(m)}" title="Учитывает цену, ликвидность, движение рынка, комиссию ${m.feePct}% и риск 7-дневной блокировки">SF ${m.score}/100 · ${m.verdict}</span>`}
 
 
 
@@ -494,7 +502,7 @@ function renderSkin(){
  draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);
 }
 
-function renderDealRadar(){const root=$('#dealRadar');if(!root)return;const draw=()=>{const source=(window.CLEAN_SKINS||window.LIVE_SKINS||[]).filter(isUsableLiveSkin),fee=Number($('#radarFee')?.value||8),rows=source.map(s=>({s,m:dealScore(s,fee)})).filter(x=>x.m.discount>0&&x.s.price>0).sort((a,b)=>b.m.score-a.m.score).slice(0,30);root.innerHTML=rows.length?rows.map(({s,m},i)=>`<a class="radar-row" href="skin.html?id=${encodeURIComponent(s.id)}"><span class="radar-rank">#${i+1}</span><img src="${s.img}" alt="" loading="lazy"><span class="radar-name"><strong>${s.name}</strong><small>${s.condition} · ${s.quantity||0} шт.</small></span><span>${money(s.price)}<small>сейчас</small></span><span class="${m.afterLock>=0?'up':'down'}">${m.afterLock>=0?'+':''}${money(m.afterLock)}<small>после комиссии и риска</small></span>${scoreBadge(s)}</a>`).join(''):'<div class="empty">Радар ждёт данные Skinport...</div>'};draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);$('#radarFee')?.addEventListener('input',draw)}
+function renderDealRadar(){const root=$('#dealRadar');if(!root)return;const draw=()=>{const source=(window.CLEAN_SKINS||window.LIVE_SKINS||[]).filter(isUsableLiveSkin),fee=Number($('#radarFee')?.value||8),rows=source.map(s=>({s,m:dealScore(s,fee)})).filter(x=>x.m.discount>0&&x.s.price>=1&&x.m.afterLock>=.5).sort((a,b)=>b.m.score-a.m.score).slice(0,30);root.innerHTML=rows.length?rows.map(({s,m},i)=>`<a class="radar-row" href="skin.html?id=${encodeURIComponent(s.id)}"><span class="radar-rank">#${i+1}</span><img src="${s.img}" alt="" loading="lazy"><span class="radar-name"><strong>${s.name}</strong><small>${s.condition} · ${s.quantity||0} шт.</small></span><span>${money(s.price)}<small>сейчас</small></span><span class="${m.afterLock>=0?'up':'down'}">${m.afterLock>=0?'+':''}${money(m.afterLock)}<small>после комиссии и риска</small></span>${scoreBadge(s,fee)}</a>`).join(''):'<div class="empty">Нет сделок с достаточным запасом после комиссии и 7-дневного риска.</div>'};draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);$('#radarFee')?.addEventListener('input',draw)}
 async function renderArbitrage(){
   const root=$('#arbRoot'); if(!root)return;
 
