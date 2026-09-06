@@ -383,8 +383,15 @@ function updateHeroSnapshot(){
 }
 
 function renderHome(){
- const pool=(window.LIVE_SKINS&&window.LIVE_SKINS.length)?window.LIVE_SKINS:SKINS.filter(s=>s.price!=null);
  let g=$('#popular');
+ const live=Array.isArray(window.LIVE_SKINS)?window.LIVE_SKINS:[];
+ if(!live.length){
+   if(g)g.innerHTML=skeletonCards(8);
+   const offers=$('#offers');if(offers)offers.innerHTML='<div class="empty">Получаем реальные цены Skinport...</div>';
+   const trends=$('#trendList');if(trends)trends.innerHTML='<div class="empty">Аналитика появится после загрузки рынка.</div>';
+   return;
+ }
+ const pool=live;
  if(g){
    const popular=pool.filter(s=>['AK-47','AWP','M4A1-S','M4A4','Glock-18','USP-S'].includes(s.weapon)).slice(0,8);
    g.innerHTML=(popular.length?popular:pool.slice(0,8)).map(card).join('');
