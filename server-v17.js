@@ -3,7 +3,7 @@ const {URL}=require('url');
 const {Pool}=require('pg');
 const NODE_ENV=process.env.NODE_ENV||'development',HOST=process.env.HOST||'0.0.0.0',PORT=Number(process.env.PORT||3000),ALLOWED_ORIGIN=process.env.ALLOWED_ORIGIN||'*',LOG_LEVEL=process.env.LOG_LEVEL||'info';
 const SESSION_SECRET=process.env.SESSION_SECRET||'skinforge-dev-change-me',STEAM_API_KEY=process.env.STEAM_API_KEY||'',STEAM_OPENID='https://steamcommunity.com/openid/login',DATABASE_URL=process.env.DATABASE_URL||'',ADMIN_SETUP_KEY=process.env.ADMIN_SETUP_KEY||'';
-const ROOT=__dirname,APP_VERSION='v20.4',CACHE_MS=5*60*1000,STALE_MS=60*60*1000,cache=new Map(),inflight=new Map(),limits=new Map();let lastGoodItems=null,lastGoodItemsAt=null,db=null,dbReady=null;
+const ROOT=__dirname,APP_VERSION='v20.5',CACHE_MS=5*60*1000,STALE_MS=60*60*1000,cache=new Map(),inflight=new Map(),limits=new Map();let lastGoodItems=null,lastGoodItemsAt=null,db=null,dbReady=null;
 const MARKET_DATA_CACHE_MS=15*60*1000,MARKET_DATA_STALE_MS=6*60*60*1000;
 const diag={started_at:new Date().toISOString(),skinport:{ok:null,last_success:null,last_error:null,item_count:0,raw_item_count:0},steam:{ok:null,last_success:null,last_error:null}};
 function log(level,message,meta={}){const l={error:0,warn:1,info:2,debug:3};if((l[level]??2)>(l[LOG_LEVEL]??2))return;console.log(JSON.stringify({time:new Date().toISOString(),level,message,...meta}))}
