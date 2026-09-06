@@ -1,8 +1,8 @@
 {
-  "name": "SkinForge Market",
-  "short_name": "SkinForge",
+  "name": "AEROX Skin Market",
+  "short_name": "AEROX",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#070a10",
-  "theme_color": "#8061ff"
+  "background_color": "#06111b",
+  "theme_color": "#20bfff"
 }
