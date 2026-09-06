@@ -337,7 +337,7 @@ ${scoreBadge(s)}
 ${s.live&&s.dealPct>0?`<div class="deal">−${s.dealPct}% к средней Skinport</div>`:''}
 <div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7||0}% vs 30д</div>
 <div class="condition">${s.live?`Skinport • ${s.quantity??0} шт.`:'загрузка...'}</div>
-<a class="card-btn" style="display:block;text-align:center" href="skin.html?id=${encodeURIComponent(s.id)}">Открыть аналитику</a></article>`}
+<a class="card-btn" style="display:block;text-align:center" href="skin.html?id=${encodeURIComponent(s.id)}">Аналитика и где продать</a></article>`}
 function updateLiveStatus(){
   const el=document.getElementById('liveStatus'); if(!el)return;
   const n=(window.LIVE_SKINS||[]).length;
@@ -478,9 +478,35 @@ function historyStat(s,key,label){
 function allSkins(){return (window.LIVE_SKINS&&window.LIVE_SKINS.length)?window.LIVE_SKINS:SKINS}
 function findSkinById(id){return allSkins().find(x=>x.id===id)||SKINS.find(x=>x.id===id)}
 async function loadSteamForSkin(s){
-  try{const r=await fetch('/api/steam?name='+encodeURIComponent(s.hash));if(!r.ok)throw new Error('Steam '+r.status);const d=await r.json();s.steam=d;return d}catch(e){console.warn('Steam price unavailable',e);s.steam=null;return null}
+  s._steamAttempted=true;const hash=s.hash||s.marketHash;
+  if(!hash)return null;
+  try{const r=await fetch('/api/steam?name='+encodeURIComponent(hash));if(!r.ok)throw new Error('Steam '+r.status);const d=await r.json();s.steam=d;return d}catch(e){console.warn('Steam price unavailable',e);s.steam=null;return null}
 }
 function historyStat(s,key,label){const h=s.history?.[key];return `<div class="stat-box"><span>${label}</span><strong>${h?.avg!=null?money(h.avg):'—'}</strong><small>${h?.volume!=null?`${h.volume} продаж`:'нет данных'}</small></div>`}
+function marketComparisonMarkup(s){
+ const hash=s.marketHash||s.hash||s.name,steam=Number(s.steam?.lowest_price)||0,draft=s.marketDraft||{};
+ const rows=[
+  {id:'skinport',name:'Skinport',kind:'cash',status:'LIVE',price:Number(s.price)||0,fee:8,readonly:true,url:s.itemPage||s.marketPage||'https://skinport.com/market'},
+  {id:'steam',name:'Steam Market',kind:'wallet',status:s.steam?'LIVE':'загрузка',price:steam,fee:15,readonly:true,url:'https://steamcommunity.com/market/listings/730/'+encodeURIComponent(hash)},
+  {id:'csfloat',name:'CSFloat',kind:'cash',status:'введите цену',price:Number(draft.csfloat?.price)||0,fee:Number(draft.csfloat?.fee??2),url:'https://csfloat.com/'},
+  {id:'dmarket',name:'DMarket',kind:'cash',status:'введите цену',price:Number(draft.dmarket?.price)||0,fee:Number(draft.dmarket?.fee??2),url:'https://dmarket.com/ingame-items/item-list/csgo-skins'}
+ ];
+ return `<section class="market-compare" id="marketCompare"><div class="market-compare-head"><div><div class="eyebrow">SKINFORGE SELL COMPARE</div><h3>Где продать выгоднее</h3><p>Сравнивай не цену на витрине, а сумму после комиссии.</p></div><div class="market-best-result" id="marketBest">Считаем лучший вариант…</div></div><div class="market-compare-table"><div class="market-compare-row market-compare-labels"><span>Площадка</span><span>Цена</span><span>Комиссия</span><span>Получишь</span><span></span></div>${rows.map(r=>`<div class="market-compare-row" data-market="${r.id}" data-kind="${r.kind}"><span class="market-title"><strong>${r.name}</strong><small>${r.status}${r.kind==='wallet'?' • Steam Wallet':' • реальные деньги'}</small></span><label><small>Цена, $</small><input class="market-price" type="number" min="0" step="0.01" value="${r.price||''}" placeholder="Введите" ${r.readonly?'readonly':''}></label><label><small>Комиссия, %</small><input class="market-fee" type="number" min="0" max="40" step="0.5" value="${r.fee}"></label><strong class="market-net">—</strong><a class="secondary market-go" href="${r.url}" target="_blank" rel="noopener noreferrer">Открыть</a></div>`).join('')}</div><div class="notice">Skinport и Steam загружаются автоматически. CSFloat и DMarket требуют ключи официальных API, поэтому их цену пока нужно ввести вручную. Комиссии меняются — поля можно исправить перед расчётом.</div></section>`;
+}
+function bindMarketComparison(s){
+ const box=$('#marketCompare');if(!box)return;s.marketDraft=s.marketDraft||{};
+ const update=()=>{
+  let best=null;
+  $$('.market-compare-row[data-market]',box).forEach(row=>{
+   const price=Math.max(0,Number($('.market-price',row)?.value)||0),fee=Math.max(0,Math.min(40,Number($('.market-fee',row)?.value)||0)),net=price*(1-fee/100),id=row.dataset.market;
+   $('.market-net',row).textContent=price?money(net):'—';row.classList.remove('market-best');
+   if(id==='csfloat'||id==='dmarket')s.marketDraft[id]={price,fee};
+   if(row.dataset.kind==='cash'&&price>0&&(!best||net>best.net))best={row,net,name:$('.market-title strong',row).textContent};
+  });
+  if(best){best.row.classList.add('market-best');$('#marketBest').innerHTML=`<small>Лучший cash-out</small><strong>${best.name} · ${money(best.net)}</strong>`}else $('#marketBest').textContent='Введите цены для сравнения';
+ };
+ $$('input',box).forEach(x=>x.addEventListener('input',update));update();
+}
 function renderSkin(){
  const root=$('#skinDetail');if(!root)return;const id=new URLSearchParams(location.search).get('id');
  const draw=()=>{
@@ -493,11 +519,12 @@ function renderSkin(){
    <div class="periods"><button data-days="1">24ч</button><button data-days="7" class="active">7д</button><button data-days="30">30д</button></div><div class="chart"><canvas id="priceChart"></canvas></div>
    <h3>Статистика Skinport</h3><div class="stats-grid">${historyStat(s,'last_24_hours','24 часа')}${historyStat(s,'last_7_days','7 дней')}${historyStat(s,'last_30_days','30 дней')}${historyStat(s,'last_90_days','90 дней')}</div>
    <div class="panel"><div class="market-row"><strong>Минимальная</strong><span>${money(s.price)}</span></div><div class="market-row"><strong>Средняя</strong><span>${money(s.mean)}</span></div><div class="market-row"><strong>Медиана</strong><span>${money(s.median)}</span></div><div class="market-row"><strong>Suggested</strong><span>${money(s.suggested)}</span></div></div>
-   <h3>Сравнение со Steam</h3><div class="panel"><div class="market-row"><strong>Steam lowest</strong><span>${s.steam?money(st):'загрузка...'}</span><a class="primary" href="${steamUrl}" target="_blank">Steam</a></div><div class="market-row"><strong>Разница Steam − Skinport</strong><span class="${diff!=null?(diff>=0?'up':'down'):''}">${diff==null?'—':`${diff>=0?'+':''}${money(diff)}`}</span></div></div><p class="muted">Steam Wallet и cash-market Skinport — разные типы стоимости.</p></div>`;
+   <h3>Сравнение со Steam</h3><div class="panel"><div class="market-row"><strong>Steam lowest</strong><span>${s.steam?money(st):'загрузка...'}</span><a class="primary" href="${steamUrl}" target="_blank">Steam</a></div><div class="market-row"><strong>Разница Steam − Skinport</strong><span class="${diff!=null?(diff>=0?'up':'down'):''}">${diff==null?'—':`${diff>=0?'+':''}${money(diff)}`}</span></div></div><p class="muted">Steam Wallet и cash-market Skinport — разные типы стоимости.</p>${marketComparisonMarkup(s)}</div>`;
    const cv=$('#priceChart');if(cv)chart(cv,s,7);$$('.periods button').forEach(b=>b.onclick=()=>{$$('.periods button').forEach(x=>x.classList.remove('active'));b.classList.add('active');chart(cv,s,+b.dataset.days)});
    $('#pfAdd')?.addEventListener('click',()=>{addPortfolioLive(s.id,+$('#pfQty').value,+$('#pfBuy').value);$('#pfAdd').textContent='✓ Добавлено'});
    $('#alertAdd')?.addEventListener('click',()=>{const target=prompt('Уведомить, когда цена станет ниже ($):',String(s.price??''));if(target&&Number(target)>0){saveAlert(s,Number(target),'below');$('#alertAdd').textContent='✓ Уведомление создано'}});
-   if(!s.steam) loadSteamForSkin(s).then(()=>draw());
+   bindMarketComparison(s);
+   if(!s.steam&&!s._steamAttempted) loadSteamForSkin(s).then(()=>draw());
  };
  draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);
 }
