@@ -126,6 +126,23 @@ function trendFromHistory(h){
   return {trend24:+pct(avg24,avg7).toFixed(1), trend7:+pct(avg7,avg30).toFixed(1)};
 }
 
+function dealScore(s,feePct=8){
+  const reference=[s.mean,s.median,s.suggested].find(v=>Number.isFinite(v)&&v>0)||s.price||0;
+  const discount=reference>0&&s.price>0?Math.max(0,(reference-s.price)/reference*100):0;
+  const liquidity=Math.min(25,Math.log10(Math.max(1,s.quantity||0)+1)*9);
+  const swing=Math.min(30,Math.abs(Number(s.trend7)||0));
+  const dataBonus=s.history?10:4;
+  const score=Math.round(Math.max(0,Math.min(100,discount*2.1+liquidity+dataBonus+20-swing*1.5)));
+  const gross=reference*(1-feePct/100)-Number(s.price||0);
+  const lockReserve=Number(s.price||0)*Math.min(.25,swing/100);
+  const afterLock=gross-lockReserve;
+  const risk=swing>=10||(s.quantity||0)<10?'Высокий':swing>=5||(s.quantity||0)<40?'Средний':'Низкий';
+  const verdict=score>=72&&afterLock>0?'Выгодно':score>=50?'Наблюдать':'Рискованно';
+  return {score,reference,discount,liquidity:Math.round(liquidity),swing,risk,gross,lockReserve,afterLock,verdict,feePct};
+}
+function scoreClass(m){return m.score>=72?'score-good':m.score>=50?'score-watch':'score-risk'}
+function scoreBadge(s){const m=dealScore(s);return `<span class="deal-score ${scoreClass(m)}" title="Учитывает цену, ликвидность, движение рынка, комиссию ${m.feePct}% и риск 7-дневной блокировки">SF ${m.score}/100 · ${m.verdict}</span>`}
+
 
 
 function skinportToSkin(i){
@@ -308,6 +325,7 @@ function card(s){return `<article class="card" data-name="${s.name.toLowerCase()
 <div class="skin-name">${s.stattrak?'<span class="st-badge">StatTrak™</span> ':''}${s.name}</div>
 <div class="condition">${s.condition||'—'}</div>
 <div class="price">${money(s.price)}</div>
+${scoreBadge(s)}
 ${s.live&&s.dealPct>0?`<div class="deal">−${s.dealPct}% к средней Skinport</div>`:''}
 <div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7||0}% vs 30д</div>
 <div class="condition">${s.live?`Skinport • ${s.quantity??0} шт.`:'загрузка...'}</div>
@@ -460,7 +478,8 @@ function renderSkin(){
  const draw=()=>{
    const s=findSkinById(id)||allSkins()[0];if(!s){root.innerHTML='<div class="empty">Загрузка Skinport...</div>';return}
    document.title=s.name+' — SkinForge';const st=s.steam?.lowest_price;const diff=(s.price!=null&&st!=null)?st-s.price:null;const steamUrl='https://steamcommunity.com/market/listings/730/'+encodeURIComponent(s.hash);
-   root.innerHTML=`<div class="detail-art"><img src="${s.img}" alt="${s.name}"></div><div><div class="eyebrow">${s.category}${s.stattrak?' • StatTrak™':''}</div><h1 style="margin:7px 0 4px">${s.name}</h1><div class="muted">${s.condition}</div><div class="big-price">${money(s.price)}</div><div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7}% vs 30д</div><div class="notice">Skinport LIVE • ${s.quantity??0} шт.</div>
+   const dm=dealScore(s);root.innerHTML=`<div class="detail-art"><img src="${s.img}" alt="${s.name}"></div><div><div class="eyebrow">${s.category}${s.stattrak?' • StatTrak™':''}</div><h1 style="margin:7px 0 4px">${s.name}</h1><div class="muted">${s.condition}</div><div class="big-price">${money(s.price)}</div><div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7}% vs 30д</div><div class="notice">Skinport LIVE • ${s.quantity??0} шт.</div>
+   <div class="score-panel ${scoreClass(dm)}"><div><span>SkinForge Deal Score</span><strong>${dm.score}/100 · ${dm.verdict}</strong></div><div class="score-grid"><span>Справедливая цена<b>${money(dm.reference)}</b></span><span>Ликвидность<b>${dm.liquidity}/25</b></span><span>Риск за 7 дней<b>${dm.risk}</b></span><span>Оценка после комиссии и риска<b class="${dm.afterLock>=0?'up':'down'}">${dm.afterLock>=0?'+':''}${money(dm.afterLock)}</b></span></div><small>Расчёт ориентировочный: после получения CS2-предмет нельзя передать дальше примерно 7 дней, поэтому SkinForge резервирует возможное движение цены за этот срок.</small></div>
    <div class="quick-actions"><button class="ghost" onclick="toggleFav('${s.id}')">♥ В избранное</button><button class="primary" id="alertAdd">🔔 Следить за ценой</button></div>
    <div class="portfolio-add"><input id="pfQty" type="number" min="0.01" step="1" value="1"><input id="pfBuy" type="number" min="0" step="0.01" value="${s.price??''}"><button class="primary" id="pfAdd">+ В портфель</button></div>
    <div class="periods"><button data-days="1">24ч</button><button data-days="7" class="active">7д</button><button data-days="30">30д</button></div><div class="chart"><canvas id="priceChart"></canvas></div>
@@ -474,6 +493,8 @@ function renderSkin(){
  };
  draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);
 }
+
+function renderDealRadar(){const root=$('#dealRadar');if(!root)return;const draw=()=>{const source=(window.CLEAN_SKINS||window.LIVE_SKINS||[]).filter(isUsableLiveSkin),fee=Number($('#radarFee')?.value||8),rows=source.map(s=>({s,m:dealScore(s,fee)})).filter(x=>x.m.discount>0&&x.s.price>0).sort((a,b)=>b.m.score-a.m.score).slice(0,30);root.innerHTML=rows.length?rows.map(({s,m},i)=>`<a class="radar-row" href="skin.html?id=${encodeURIComponent(s.id)}"><span class="radar-rank">#${i+1}</span><img src="${s.img}" alt="" loading="lazy"><span class="radar-name"><strong>${s.name}</strong><small>${s.condition} · ${s.quantity||0} шт.</small></span><span>${money(s.price)}<small>сейчас</small></span><span class="${m.afterLock>=0?'up':'down'}">${m.afterLock>=0?'+':''}${money(m.afterLock)}<small>после комиссии и риска</small></span>${scoreBadge(s)}</a>`).join(''):'<div class="empty">Радар ждёт данные Skinport...</div>'};draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);$('#radarFee')?.addEventListener('input',draw)}
 async function renderArbitrage(){
   const root=$('#arbRoot'); if(!root)return;
 
@@ -599,7 +620,7 @@ function renderCalculator(){const root=$('#calcRoot');if(!root)return;root.inner
 function renderNews(){let r=$('#newsGrid');if(r)r.innerHTML=NEWS.map(n=>`<article class="news-card"><div class="news-meta">${n.date} • ${n.tag}</div><h3>${n.title}</h3><p>${n.text}</p><a href="${n.url}" target="_blank">Открыть источник</a></article>`).join('')}
 document.addEventListener('DOMContentLoaded',()=>{
   setupMobileNav();setLoadingState();checkSystemStatus();
-  renderHome();renderCatalog();renderSkin();renderNews();renderArbitrage();renderPortfolio();renderFavorites();renderAlerts();renderAnalytics();renderCalculator();updateLiveStatus();updateHeroSnapshot();
+  renderHome();renderCatalog();renderSkin();renderNews();renderArbitrage();renderPortfolio();renderFavorites();renderAlerts();renderAnalytics();renderCalculator();renderDealRadar();updateLiveStatus();updateHeroSnapshot();
 
   document.addEventListener('skinforge-live-ready',()=>{syncWeaponFilter();renderHome();updateLiveStatus();updateHeroSnapshot()});
   document.addEventListener('skinforge-history-ready',renderHome);
