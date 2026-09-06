@@ -1,4 +1,4 @@
-// AEROX v20.1 — reliable detail page selection by exact market hash
+// AEROX v20.2 — reliable detail selection without image-gated blank screen
 (() => {
   const params = () => new URLSearchParams(location.search);
   const getRequestedId = () => params().get('id') || '';
@@ -22,42 +22,26 @@
     return s;
   }
 
-  function showCorrectDetail() {
+  function reveal() {
     const root = document.getElementById('skinDetail');
     if (!root) return;
-    const s = prepareSelected();
-    if (!s) return;
-    requestAnimationFrame(() => {
-      root.style.visibility = 'visible';
-      root.style.opacity = '1';
-    });
+    root.style.visibility = 'visible';
+    root.style.opacity = '1';
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     const root = document.getElementById('skinDetail');
-    if (root) {
-      root.style.visibility = 'hidden';
-      root.style.opacity = '0';
-      root.style.transition = 'opacity .12s ease';
-    }
+    if (!root) return;
+    root.style.visibility = 'visible';
+    root.style.opacity = '1';
+    root.style.transition = 'opacity .12s ease';
   });
 
   document.addEventListener('skinforge-live-ready', () => {
-    const s = prepareSelected();
-    if (!s) return;
-    if (s.img && !String(s.img).includes('specs.gg/assets/img/cs2_skins/')) showCorrectDetail();
-  });
-
-  document.addEventListener('skinforge-images-ready', () => {
     prepareSelected();
-    requestAnimationFrame(() => requestAnimationFrame(showCorrectDetail));
+    reveal();
   });
-
-  setTimeout(() => {
-    const root = document.getElementById('skinDetail');
-    if (root && prepareSelected()) {
-      root.style.visibility = 'visible';
-      root.style.opacity = '1';
-    }
-  }, 5000);
+  document.addEventListener('skinforge-images-ready', reveal);
+  document.addEventListener('skinforge-history-ready', reveal);
+  setTimeout(reveal, 600);
 })();
