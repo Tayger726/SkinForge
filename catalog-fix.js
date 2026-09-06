@@ -124,7 +124,7 @@
 
   document.addEventListener('error', e => {
     const img = e.target;
-    if (!img || img.tagName !== 'IMG' || !img.closest('.skin-card,.card,.result-card')) return;
+    if (!img || img.tagName !== 'IMG' || !img.closest('.skin-card,.card,.result-card,.related-card')) return;
     const skinName = img.alt || img.getAttribute('data-name') || '';
     const live = Array.isArray(window.LIVE_SKINS) ? window.LIVE_SKINS : [];
     const skin = live.find(s => String(s.name||'') === skinName || String(s.marketHash||'') === skinName);
