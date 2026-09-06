@@ -477,40 +477,39 @@ function historyStat(s,key,label){
 
 function allSkins(){return (window.LIVE_SKINS&&window.LIVE_SKINS.length)?window.LIVE_SKINS:SKINS}
 function findSkinById(id){return allSkins().find(x=>x.id===id)||SKINS.find(x=>x.id===id)}
-async function loadSteamForSkin(s){
-  s._steamAttempted=true;const hash=s.hash||s.marketHash;
+async function loadMarketPricesForSkin(s){
+  s._marketAttempted=true;const hash=s.hash||s.marketHash;
   if(!hash)return null;
-  try{const r=await fetch('/api/steam?name='+encodeURIComponent(hash));if(!r.ok)throw new Error('Steam '+r.status);const d=await r.json();s.steam=d;return d}catch(e){console.warn('Steam price unavailable',e);s.steam=null;return null}
+  try{const r=await fetch('/api/market-prices?name='+encodeURIComponent(hash));if(!r.ok)throw new Error('Market prices '+r.status);const d=await r.json();s.marketPrices=d.markets||{};const st=s.marketPrices.steam;if(st?.buy)s.steam={success:true,lowest_price:st.buy,reference_type:st.price_type};return d}catch(e){console.warn('Market prices unavailable',e);s.marketPrices={};return null}
 }
 function historyStat(s,key,label){const h=s.history?.[key];return `<div class="stat-box"><span>${label}</span><strong>${h?.avg!=null?money(h.avg):'—'}</strong><small>${h?.volume!=null?`${h.volume} продаж`:'нет данных'}</small></div>`}
 function marketComparisonMarkup(s){
- const hash=s.marketHash||s.hash||s.name,steam=Number(s.steam?.lowest_price)||0,draft=s.marketDraft||{};
+ const hash=s.marketHash||s.hash||s.name,prices=s.marketPrices||{},steam=Number(s.steam?.lowest_price)||Number(prices.steam?.sell)||0,csfloat=Number(prices.csfloat?.sell)||0;
  const rows=[
   {id:'skinport',name:'Skinport',kind:'cash',status:'LIVE',price:Number(s.price)||0,fee:8,readonly:true,url:s.itemPage||s.marketPage||'https://skinport.com/market'},
-  {id:'steam',name:'Steam Market',kind:'wallet',status:steam?'LIVE':'введите цену',price:steam,fee:15,readonly:steam>0,url:'https://steamcommunity.com/market/listings/730/'+encodeURIComponent(hash)},
-  {id:'csfloat',name:'CSFloat',kind:'cash',status:'введите цену',price:Number(draft.csfloat?.price)||0,fee:Number(draft.csfloat?.fee??2),url:'https://csfloat.com/'},
-  {id:'dmarket',name:'DMarket',kind:'cash',status:'введите цену',price:Number(draft.dmarket?.price)||0,fee:Number(draft.dmarket?.fee??2),url:'https://dmarket.com/ingame-items/item-list/csgo-skins'}
+  {id:'steam',name:'Steam Market',kind:'wallet',status:steam?(prices.steam?.price_type||'LIVE'):'Цена временно недоступна',price:steam,fee:15,url:'https://steamcommunity.com/market/listings/730/'+encodeURIComponent(hash)},
+  {id:'csfloat',name:'CSFloat',kind:'cash',status:csfloat?'Лучший ордер':'Цена временно недоступна',price:csfloat,fee:2,url:'https://csfloat.com/'},
+  {id:'dmarket',name:'DMarket',kind:'cash',status:'Цена временно недоступна',price:0,fee:2,disabled:true,url:'https://dmarket.com/ingame-items/item-list/csgo-skins'}
  ];
- return `<section class="market-compare" id="marketCompare"><div class="market-compare-head"><div><div class="eyebrow">SKINFORGE SELL COMPARE</div><h3>Где продать выгоднее</h3><p>Сравнивай не цену на витрине, а сумму после комиссии.</p></div><div class="market-best-result" id="marketBest">Считаем лучший вариант…</div></div><div class="market-compare-table"><div class="market-compare-row market-compare-labels"><span>Площадка</span><span>Цена</span><span>Комиссия</span><span>Получишь</span><span></span></div>${rows.map(r=>`<div class="market-compare-row" data-market="${r.id}" data-kind="${r.kind}"><span class="market-title"><strong>${r.name}</strong><small>${r.status}${r.kind==='wallet'?' • Steam Wallet':' • реальные деньги'}</small></span><label><small>Цена, $</small><input class="market-price" type="number" min="0" step="0.01" value="${r.price||''}" placeholder="Введите" ${r.readonly?'readonly':''}></label><label><small>Комиссия, %</small><input class="market-fee" type="number" min="0" max="40" step="0.5" value="${r.fee}"></label><strong class="market-net">—</strong><a class="secondary market-go" href="${r.url}" target="_blank" rel="noopener noreferrer">Открыть</a></div>`).join('')}</div><div class="notice">Skinport загружается автоматически. Steam использует кэш, а при ограничении запросов цену можно ввести вручную. CSFloat и DMarket требуют ключи официальных API, поэтому их цена пока вводится вручную. Комиссии меняются — поля можно исправить.</div></section>`;
+ return `<section class="market-compare" id="marketCompare"><div class="market-compare-head"><div><div class="eyebrow">AEROX SELL COMPARE</div><h3>Где продать выгоднее</h3><p>Сравнивай не цену на витрине, а сумму после комиссии.</p></div><div class="market-best-result" id="marketBest">Считаем лучший вариант…</div></div><div class="market-compare-table"><div class="market-compare-row market-compare-labels"><span>Площадка</span><span>Цена</span><span>Комиссия</span><span>Получишь</span><span></span></div>${rows.map(r=>`<div class="market-compare-row${r.disabled?' market-unavailable':''}" data-market="${r.id}" data-kind="${r.kind}"><span class="market-title"><strong>${r.name}</strong><small>${r.status}${r.kind==='wallet'?' • Steam Wallet':' • реальные деньги'}</small></span><label><small>Цена, $</small><input class="market-price" type="number" min="0" step="0.01" value="${r.price||''}" placeholder="Нет данных" readonly></label><label><small>Комиссия, %</small><input class="market-fee" type="number" min="0" max="40" step="0.5" value="${r.fee}" ${r.disabled?'disabled':''}></label><strong class="market-net">${r.disabled?'Недоступно':'—'}</strong><a class="secondary market-go" href="${r.url}" target="_blank" rel="noopener noreferrer">Открыть</a></div>`).join('')}</div><div class="notice">Skinport — текущая цена, CSFloat — лучший ордер на покупку, Steam — реальная средняя цена последних продаж в Steam Wallet. DMarket честно помечен как недоступный, пока нет официального API-ключа. Цены обновляются автоматически и не выдумываются.</div></section>`;
 }
 function bindMarketComparison(s){
  const box=$('#marketCompare');if(!box)return;s.marketDraft=s.marketDraft||{};
  const update=()=>{
   let best=null;
   $$('.market-compare-row[data-market]',box).forEach(row=>{
-   const price=Math.max(0,Number($('.market-price',row)?.value)||0),fee=Math.max(0,Math.min(40,Number($('.market-fee',row)?.value)||0)),net=price*(1-fee/100),id=row.dataset.market;
-   $('.market-net',row).textContent=price?money(net):'—';row.classList.remove('market-best');
-   if(id==='csfloat'||id==='dmarket')s.marketDraft[id]={price,fee};
+   const price=Math.max(0,Number($('.market-price',row)?.value)||0),fee=Math.max(0,Math.min(40,Number($('.market-fee',row)?.value)||0)),net=price*(1-fee/100);
+   $('.market-net',row).textContent=price?money(net):(row.classList.contains('market-unavailable')?'Недоступно':'—');row.classList.remove('market-best');
    if(row.dataset.kind==='cash'&&price>0&&(!best||net>best.net))best={row,net,name:$('.market-title strong',row).textContent};
   });
-  if(best){best.row.classList.add('market-best');$('#marketBest').innerHTML=`<small>Лучший cash-out</small><strong>${best.name} · ${money(best.net)}</strong>`}else $('#marketBest').textContent='Введите цены для сравнения';
+  if(best){best.row.classList.add('market-best');$('#marketBest').innerHTML=`<small>Лучший cash-out</small><strong>${best.name} · ${money(best.net)}</strong>`}else $('#marketBest').textContent='Цены временно недоступны';
  };
  $$('input',box).forEach(x=>x.addEventListener('input',update));update();
 }
 function renderSkin(){
- const root=$('#skinDetail');if(!root)return;const id=new URLSearchParams(location.search).get('id');
+ const root=$('#skinDetail');if(!root)return;const query=new URLSearchParams(location.search),id=query.get('id'),requestedHash=query.get('hash');
  const draw=()=>{
-   const s=findSkinById(id)||allSkins()[0];if(!s){root.innerHTML='<div class="empty">Загрузка Skinport...</div>';return}
+   const s=requestedHash?allSkins().find(x=>(x.marketHash||x.hash)===requestedHash):(id?findSkinById(id):allSkins()[0]);if(!s){root.innerHTML='<div class="detail-loading" role="status"><div class="detail-loading-art"></div><div><div class="detail-loading-line wide"></div><div class="detail-loading-line"></div><div class="detail-loading-line price"></div><p>Загружаем выбранный скин и актуальные цены…</p></div></div>';return}
    renderHistorySummary(s.history||null);
    document.title=s.name+' — SkinForge';const st=s.steam?.lowest_price;const diff=(s.price!=null&&st!=null)?st-s.price:null;const steamUrl='https://steamcommunity.com/market/listings/730/'+encodeURIComponent(s.hash);
    const dm=dealScore(s);root.innerHTML=`<div class="detail-art"><img src="${s.img}" alt="${s.name}"></div><div><div class="eyebrow">${s.category}${s.stattrak?' • StatTrak™':''}</div><h1 style="margin:7px 0 4px">${s.name}</h1><div class="muted">${s.condition}</div><div class="big-price">${money(s.price)}</div><div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7}% vs 30д</div><div class="notice">Skinport LIVE • ${s.quantity??0} шт.</div>
@@ -525,7 +524,7 @@ function renderSkin(){
    $('#pfAdd')?.addEventListener('click',()=>{addPortfolioLive(s.id,+$('#pfQty').value,+$('#pfBuy').value);$('#pfAdd').textContent='✓ Добавлено'});
    $('#alertAdd')?.addEventListener('click',()=>{const target=prompt('Уведомить, когда цена станет ниже ($):',String(s.price??''));if(target&&Number(target)>0){saveAlert(s,Number(target),'below');$('#alertAdd').textContent='✓ Уведомление создано'}});
    bindMarketComparison(s);
-   if(!s.steam&&!s._steamAttempted) loadSteamForSkin(s).then(()=>draw());
+   if(!s._marketAttempted) loadMarketPricesForSkin(s).then(()=>draw());
  };
  draw();document.addEventListener('skinforge-live-ready',draw);document.addEventListener('skinforge-history-ready',draw);
 }

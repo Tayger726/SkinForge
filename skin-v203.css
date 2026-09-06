@@ -1,0 +1,11 @@
+.market-unavailable{opacity:.62}
+.market-unavailable input{cursor:not-allowed}
+.detail-loading{grid-column:1/-1;display:grid;grid-template-columns:.8fr 1.2fr;gap:20px;padding:40px 0;min-height:430px}
+.detail-loading-art,.detail-loading-line{background:linear-gradient(90deg,#0b1d2b,#12384c,#0b1d2b);background-size:220% 100%;animation:aerox-loading 1.25s linear infinite;border:1px solid #16445a}
+.detail-loading-art{border-radius:20px;min-height:360px}
+.detail-loading-line{height:18px;border-radius:8px;margin:15px 0;width:48%}
+.detail-loading-line.wide{height:38px;width:82%;margin-top:42px}
+.detail-loading-line.price{height:44px;width:32%}
+.detail-loading p{color:#7192a5;margin-top:24px}
+@keyframes aerox-loading{to{background-position:-220% 0}}
+@media(max-width:850px){.detail-loading{grid-template-columns:1fr}.detail-loading-art{min-height:240px}}
