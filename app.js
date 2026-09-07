@@ -90,7 +90,7 @@ function watchlist(){try{return JSON.parse(localStorage.getItem('skinforge_favs'
 const favs=()=>watchlist().map(x=>x.id);
 const setWatchlist=v=>localStorage.setItem('skinforge_favs',JSON.stringify(v));
 function toggleFav(id){let list=watchlist(),i=list.findIndex(x=>x.id===id);if(i>=0)list.splice(i,1);else{const s=findSkinById(id);list.unshift({id,hash:s?.marketHash||s?.hash||'',name:s?.name||'',condition:s?.condition||'',image:s?.img||'',addedPrice:Number(s?.price)||null,targetPrice:null,addedAt:Date.now()})}setWatchlist(list);renderFavStates();document.dispatchEvent(new Event('skinforge-watchlist-change'))}
-function renderFavStates(){$$('.fav').forEach(b=>b.classList.toggle('active',favs().includes(b.dataset.id)))}
+function renderFavStates(){const selected=new Set(favs());$$('.fav').forEach(b=>{b.classList.toggle('active',selected.has(b.dataset.id));b.onclick=()=>toggleFav(b.dataset.id)})}
 
 function portfolio(){return JSON.parse(localStorage.getItem('skinforge_portfolio')||'[]')}
 function setPortfolio(v){localStorage.setItem('skinforge_portfolio',JSON.stringify(v))}
@@ -664,7 +664,6 @@ function renderCalculator(){const root=$('#calcRoot');if(!root)return;root.inner
 function renderNews(){let r=$('#newsGrid');if(r)r.innerHTML=NEWS.map(n=>`<article class="news-card"><div class="news-meta">${n.date} • ${n.tag}</div><h3>${n.title}</h3><p>${n.text}</p><a href="${n.url}" target="_blank">Открыть источник</a></article>`).join('')}
 document.addEventListener('DOMContentLoaded',()=>{
   setupMobileNav();setLoadingState();checkSystemStatus();
-  document.addEventListener('click',e=>{const button=e.target.closest?.('.fav[data-id]');if(!button)return;e.preventDefault();toggleFav(button.dataset.id)});
   renderHome();renderCatalog();renderSkin();renderNews();renderArbitrage();renderPortfolio();renderFavorites();renderAlerts();renderAnalytics();renderCalculator();renderDealRadar();updateLiveStatus();updateHeroSnapshot();
 
   document.addEventListener('skinforge-live-ready',()=>{syncWeaponFilter();renderHome();updateLiveStatus();updateHeroSnapshot()});
