@@ -228,24 +228,27 @@ async function loadLiveData(){
     window.LIVE_READY=live.length>0;
     window.LIVE_UPDATED_AT=Date.now();
 
+    checkPriceAlerts();
+    markSkinportOnline();document.dispatchEvent(new Event('skinforge-live-ready'));
+    // Render usable prices before waiting for optional historical statistics.
+    if(!document.querySelector('#skinDetail,#catalogGrid,#analyticsRoot,#dealRadar'))return;
+
     try{
-      const hr=await fetch('/api/history',{cache:'no-store'});
+      const hash=new URLSearchParams(location.search).get('hash');
+      const hr=await fetch('/api/history?compact=1'+(document.getElementById('skinDetail')&&hash?'&name='+encodeURIComponent(hash):''),{cache:'no-store'});
       if(hr.ok){
         const hist=await hr.json();
         if(Array.isArray(hist)){
           const norm=v=>String(v||'').replace(/\s+/g,' ').trim().toLowerCase();
           const hm=new Map(hist.map(x=>[norm(x.market_hash_name),x]));
           live.forEach(s=>{
-            const h=hm.get(norm(s.hash));
+            const h=hm.get(norm(s.marketHash||s.hash));
             if(h){s.history=h;Object.assign(s,trendFromHistory(h));}
           });
         }
       }
     }catch(e){console.warn('History unavailable',e)}
 
-    checkPriceAlerts();
-    console.log(`SkinForge v13: Skinport LIVE ${live.length} items`);
-    markSkinportOnline();document.dispatchEvent(new Event('skinforge-live-ready'));
     document.dispatchEvent(new Event('skinforge-history-ready'));
   }catch(e){
     console.warn('Skinport items unavailable',e);
