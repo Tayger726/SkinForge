@@ -330,7 +330,7 @@ function setLoadingState(){
 }
 
 function card(s){return `<article class="card" data-name="${s.name.toLowerCase()}" data-cat="${s.category}">
-<button class="fav" data-id="${s.id}" onclick="toggleFav('${s.id}')" title="В избранное">♥</button>
+<button class="fav" type="button" data-id="${s.id}" title="Добавить в Watchlist">♥</button>
 <div class="skin-art"><img src="${s.img}" alt="${s.name}" loading="lazy" onerror="this.style.display='none'"></div>
 <div class="skin-name">${s.stattrak?'<span class="st-badge">StatTrak™</span> ':''}${s.name}</div>
 <div class="condition">${s.condition||'—'}</div>
@@ -664,6 +664,7 @@ function renderCalculator(){const root=$('#calcRoot');if(!root)return;root.inner
 function renderNews(){let r=$('#newsGrid');if(r)r.innerHTML=NEWS.map(n=>`<article class="news-card"><div class="news-meta">${n.date} • ${n.tag}</div><h3>${n.title}</h3><p>${n.text}</p><a href="${n.url}" target="_blank">Открыть источник</a></article>`).join('')}
 document.addEventListener('DOMContentLoaded',()=>{
   setupMobileNav();setLoadingState();checkSystemStatus();
+  document.addEventListener('click',e=>{const button=e.target.closest?.('.fav[data-id]');if(!button)return;e.preventDefault();toggleFav(button.dataset.id)});
   renderHome();renderCatalog();renderSkin();renderNews();renderArbitrage();renderPortfolio();renderFavorites();renderAlerts();renderAnalytics();renderCalculator();renderDealRadar();updateLiveStatus();updateHeroSnapshot();
 
   document.addEventListener('skinforge-live-ready',()=>{syncWeaponFilter();renderHome();updateLiveStatus();updateHeroSnapshot()});
