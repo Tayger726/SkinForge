@@ -445,7 +445,8 @@ function renderCatalog(){
  if(params.get('fav')==='1'&&$('#onlyFav'))$('#onlyFav').checked=true;
  const PAGE_SIZE=24; let page=1;
  const run=()=>{
-   const source=(window.LIVE_SKINS&&window.LIVE_SKINS.length)?window.LIVE_SKINS:SKINS;
+   const source=Array.isArray(window.LIVE_SKINS)?window.LIVE_SKINS:[];
+   if(!source.length){grid.innerHTML=window.LIVE_READY===false?'<div class="empty">Рыночные данные недоступны. Обнови страницу позже.</div>':skeletonCards(12);$('#resultCount').textContent=window.LIVE_READY===false?'Нет актуальных цен':'Загружаем реальные цены…';return;}
    let q=$('#searchInput').value.trim(),cat=$('#category').value,weapon=$('#weaponFilter')?.value||'',cond=$('#conditionFilter')?.value||'',st=$('#stattrakFilter')?.value||'all',min=+($('#minPrice').value||0),max=+($('#maxPrice').value||999999),sort=$('#sort').value,onlyFav=$('#onlyFav').checked;
    let data=source.filter(s=>smartMatch(s,q)&&(!cat||s.category===cat)&&(!weapon||s.weapon===weapon)&&(!cond||s.condition===cond)&&(st==='all'||(st==='yes'&&s.stattrak)||(st==='no'&&!s.stattrak))&&s.price!=null&&s.price>=min&&s.price<=max&&(!onlyFav||favs().includes(s.id)));
    if(sort==='low')data.sort((a,b)=>a.price-b.price);if(sort==='high')data.sort((a,b)=>b.price-a.price);if(sort==='rise')data.sort((a,b)=>b.trend7-a.trend7);if(sort==='fall')data.sort((a,b)=>a.trend7-b.trend7);if(sort==='deal')data.sort((a,b)=>(b.dealPct||0)-(a.dealPct||0));
