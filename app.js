@@ -86,9 +86,10 @@ function heroGo(){const q=(document.getElementById('heroSearch')?.value||'').tri
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const money=n=>n==null?'—':'$'+Number(n).toFixed(2);
 const htmlEsc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function watchlist(){try{return JSON.parse(localStorage.getItem('skinforge_favs')||'[]').map(x=>typeof x==='string'?{id:x}:x).filter(x=>x&&typeof x.id==='string').slice(0,2000)}catch(e){return[]}}
+let watchMemory=[];
+function watchlist(){try{watchMemory=JSON.parse(localStorage.getItem('skinforge_favs')||'[]').map(x=>typeof x==='string'?{id:x}:x).filter(x=>x&&typeof x.id==='string').slice(0,2000)}catch(e){}return watchMemory}
 const favs=()=>watchlist().map(x=>x.id);
-const setWatchlist=v=>localStorage.setItem('skinforge_favs',JSON.stringify(v));
+function setWatchlist(v){watchMemory=Array.isArray(v)?v:[];try{localStorage.setItem('skinforge_favs',JSON.stringify(watchMemory))}catch(e){}}
 function toggleFav(id){let list=watchlist(),i=list.findIndex(x=>x.id===id);if(i>=0)list.splice(i,1);else{const s=findSkinById(id);list.unshift({id,hash:s?.marketHash||s?.hash||'',name:s?.name||'',condition:s?.condition||'',image:s?.img||'',addedPrice:Number(s?.price)||null,targetPrice:null,addedAt:Date.now()})}setWatchlist(list);renderFavStates();document.dispatchEvent(new Event('skinforge-watchlist-change'))}
 function renderFavStates(){const selected=new Set(favs());$$('.fav').forEach(b=>{b.classList.toggle('active',selected.has(b.dataset.id));b.onclick=()=>toggleFav(b.dataset.id)})}
 
