@@ -2,7 +2,7 @@
 (() => {
   const WEAPONS = [
     'AK-47','AUG','AWP','Bayonet','Bowie Knife','Butterfly Knife','Classic Knife','CZ75-Auto',
-    'Desert Eagle','Dual Berettas','FAMAS','Five-SeveN','Flip Knife','G3SG1','Galil AR','Glock-18',
+    'Falchion Knife','Desert Eagle','Dual Berettas','FAMAS','Five-SeveN','Flip Knife','G3SG1','Galil AR','Glock-18',
     'Gut Knife','Huntsman Knife','Karambit','Kukri Knife','M249','M4A1-S','M4A4','M9 Bayonet','MAC-10',
     'MAG-7','MP5-SD','MP7','MP9','Navaja Knife','Negev','Nomad Knife','Nova','P2000','P250',
     'P90','Paracord Knife','PP-Bizon','R8 Revolver','Sawed-Off','SCAR-20','SG 553','Shadow Daggers',
@@ -36,7 +36,7 @@
     if (/charm\s*\|/.test(n)) return 'charm';
     if (/music kit\s*\|/.test(n)) return 'music';
     if (/graffiti\s*\|/.test(n)) return 'graffiti';
-    const cleaned = raw.replace(/^Souvenir\s+/i,'').replace(/^StatTrak™\s*/i,'').replace(/^★\s*/,'').trim();
+    const cleaned = raw.replace(/^Souvenir\s+/i,'').replace(/^★\s*/,'').replace(/^StatTrak™\s*/i,'').trim();
     const weapon = cleaned.split('|')[0].trim();
     return WEAPON_SET.has(weapon.toLowerCase()) ? 'skin' : 'other';
   };
