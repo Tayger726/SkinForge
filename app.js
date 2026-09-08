@@ -86,11 +86,14 @@ function heroGo(){const q=(document.getElementById('heroSearch')?.value||'').tri
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const money=n=>n==null||!Number.isFinite(Number(n))?'—':'$'+Number(n).toFixed(2);
 const htmlEsc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function analyticsVisitor(){try{const key='aerox_analytics_visitor',now=Date.now();let x=JSON.parse(localStorage.getItem(key)||'null');if(!x||typeof x.id!=='string'||!x.created||now-x.created>30*86400000){x={id:(crypto.randomUUID?.()||('v'+now+Math.random().toString(36).slice(2))).replace(/-/g,''),created:now};localStorage.setItem(key,JSON.stringify(x))}return x.id}catch(e){return null}}
+function trackEvent(eventName,details={}){if(localStorage.getItem('aerox_analytics_optout')==='1')return;const visitor=analyticsVisitor();if(!visitor)return;const payload={visitor_id:visitor,event_name:eventName,page:location.pathname||'/',item_name:String(details.item_name||'').slice(0,220)||undefined,market:String(details.market||'').slice(0,40)||undefined};fetch('/api/events',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),keepalive:true}).catch(()=>{})}
+window.AeroxAnalytics={track:trackEvent,optOut(){localStorage.setItem('aerox_analytics_optout','1');localStorage.removeItem('aerox_analytics_visitor')},optIn(){localStorage.removeItem('aerox_analytics_optout')}};
 let watchMemory=[];
 function watchlist(){try{watchMemory=JSON.parse(localStorage.getItem('skinforge_favs')||'[]').map(x=>typeof x==='string'?{id:x}:x).filter(x=>x&&typeof x.id==='string').slice(0,2000)}catch(e){}return watchMemory}
 const favs=()=>watchlist().map(x=>x.id);
 function setWatchlist(v){watchMemory=Array.isArray(v)?v:[];try{localStorage.setItem('skinforge_favs',JSON.stringify(watchMemory))}catch(e){}}
-function toggleFav(id){let list=watchlist(),i=list.findIndex(x=>x.id===id);if(i>=0)list.splice(i,1);else{const s=findSkinById(id);list.unshift({id,hash:s?.marketHash||s?.hash||'',name:s?.name||'',condition:s?.condition||'',image:s?.img||'',addedPrice:Number(s?.price)||null,targetPrice:null,addedAt:Date.now(),updatedAt:Date.now()})}setWatchlist(list);renderFavStates();document.dispatchEvent(new Event('skinforge-watchlist-change'))}
+function toggleFav(id){let list=watchlist(),i=list.findIndex(x=>x.id===id);if(i>=0)list.splice(i,1);else{const s=findSkinById(id);list.unshift({id,hash:s?.marketHash||s?.hash||'',name:s?.name||'',condition:s?.condition||'',image:s?.img||'',addedPrice:Number(s?.price)||null,targetPrice:null,addedAt:Date.now(),updatedAt:Date.now()});trackEvent('favorite_add',{item_name:s?.name})}setWatchlist(list);renderFavStates();document.dispatchEvent(new Event('skinforge-watchlist-change'))}
 function renderFavStates(){const selected=new Set(favs());$$('.fav').forEach(b=>{const active=selected.has(b.dataset.id);b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));b.title=active?'Удалить из Watchlist':'Добавить в Watchlist'})}
 document.addEventListener('click',event=>{const button=event.target.closest?.('.fav[data-id]');if(!button)return;event.preventDefault();toggleFav(button.dataset.id)});
 
@@ -531,9 +534,10 @@ function bindMarketComparison(s){
 }
 function renderSkin(){
  const root=$('#skinDetail');if(!root)return;const query=new URLSearchParams(location.search),id=query.get('id'),requestedHash=query.get('hash');
+ let trackedSkin='';
  const draw=()=>{
    const live=Array.isArray(window.LIVE_SKINS)?window.LIVE_SKINS:[],legacy=id?SKINS.find(x=>x.id===id):null;const s=requestedHash?live.find(x=>(x.marketHash||x.hash)===requestedHash):(id?live.find(x=>x.id===id||(legacy&&(x.marketHash||x.hash)===(legacy.marketHash||legacy.hash))):null);if(!s){if(window.LIVE_READY!==undefined){root.innerHTML='<div class="empty" role="status"><h2>'+ (window.LIVE_READY===false?'Цены временно недоступны':'Скин не найден в текущем каталоге')+'</h2><p>Обнови страницу позже или выбери другой предмет.</p><a class="primary" href="catalog.html">Открыть каталог</a></div>';return;}root.innerHTML='<div class="detail-loading" role="status"><div class="detail-loading-art"></div><div><div class="detail-loading-line wide"></div><div class="detail-loading-line"></div><div class="detail-loading-line price"></div><p>Загружаем выбранный скин и актуальные цены…</p></div></div>';return}
-   renderHistorySummary(s.history||null);
+   renderHistorySummary(s.history||null);const trackKey=s.marketHash||s.hash||s.id;if(trackKey!==trackedSkin){trackedSkin=trackKey;trackEvent('skin_view',{item_name:s.name})}
    document.title=s.name+' — AEROX';const st=s.steam?.lowest_price;const diff=(s.price!=null&&st!=null)?st-s.price:null;const steamUrl='https://steamcommunity.com/market/listings/730/'+encodeURIComponent(s.hash);
    const dm=dealScore(s);root.innerHTML=`<div class="detail-art"><img src="${s.img}" alt="${s.name}"></div><div><div class="eyebrow">${s.category}${s.stattrak?' • StatTrak™':''}</div><h1 style="margin:7px 0 4px">${s.name}</h1><div class="muted">${s.condition}</div><div class="big-price">${money(s.price)}</div><div class="trend ${s.trend7>=0?'up':'down'}">${s.trend7>=0?'▲ +':'▼ '}${s.trend7}% vs 30д</div><div class="notice">Skinport LIVE • ${s.quantity??0} шт.</div>
    <div class="score-panel ${scoreClass(dm)}"><div><span>AEROX Deal Score</span><strong>${dm.score}/100 · ${dm.verdict}</strong></div><div class="score-grid"><span>Ориентир Skinport<b>${money(dm.reference)}</b></span><span>Ликвидность<b>${dm.liquidity}/25</b></span><span>Риск за 7 дней<b>${dm.risk}</b></span><span>Прибыль от перепродажи<b>Не подтверждена</b></span></div><small>Оценка сравнивает цену покупки с ориентиром Skinport, а не с предложением покупателя. Скидка не означает прибыль. Комиссии и изменение цены за время торговой блокировки могут привести к убытку.</small></div>
@@ -663,10 +667,11 @@ function portfolioSource(){return allSkins()}
 function addPortfolioLive(id,qty=1,buyPrice=null){
  const s=findSkinById(id);if(!s)return;let p=portfolio(),e=p.find(x=>x.id===id);qty=Math.max(.01,Number(qty)||1);buyPrice=Number(buyPrice);if(!Number.isFinite(buyPrice)||buyPrice<=0)buyPrice=Number(s.price)||0;
  if(e){const old=Number(e.qty)||0,n=old+qty;e.buyPrice=((Number(e.buyPrice)||0)*old+buyPrice*qty)/n;e.qty=n;e.hash=s.hash;e.name=s.name}else p.push({id,hash:s.hash,name:s.name,qty,buyPrice,addedAt:Date.now()});setPortfolio(p);document.dispatchEvent(new Event('skinforge-portfolio-change'));
+ trackEvent('portfolio_add',{item_name:s.name});
 }
 function alerts(){return readSavedList('skinforge_alerts')}
 function setAlerts(v){localStorage.setItem('skinforge_alerts',JSON.stringify(v))}
-function saveAlert(s,target,direction='below'){let a=alerts();a.push({id:'a'+Date.now(),skinId:s.id,hash:s.hash,name:s.name,condition:s.condition,target:Number(target),direction,createdAt:Date.now(),triggered:false});setAlerts(a);document.dispatchEvent(new Event('skinforge-alerts-change'))}
+function saveAlert(s,target,direction='below'){let a=alerts();a.push({id:'a'+Date.now(),skinId:s.id,hash:s.hash,name:s.name,condition:s.condition,target:Number(target),direction,createdAt:Date.now(),triggered:false});setAlerts(a);document.dispatchEvent(new Event('skinforge-alerts-change'));trackEvent('price_alert_add',{item_name:s.name})}
 function verifiedDealSnapshot(s,options={}){
  const prices=s?.marketPrices||{},valid=(v,d)=>{const n=Number(v);return Number.isFinite(n)&&n>0&&d?.stale!==true?n:null};
  const buys={skinport:valid(s?.price,{stale:s?.marketStale===true}),csfloat:valid(prices.csfloat?.buy,prices.csfloat),lisskins:valid(prices.lisskins?.buy,prices.lisskins)};
@@ -683,7 +688,7 @@ function saveProfitAlert(s,minProfit=1,minRoi=0,reservePct=5){
  const hash=s.marketHash||s.hash||'',now=Date.now(),a=alerts();
  const existing=a.find(x=>x.kind==='profit'&&x.hash===hash&&!x.triggered);
  const value={id:existing?.id||'p'+now,kind:'profit',skinId:s.id,hash,name:s.name,condition:s.condition,minProfit:Math.max(0,Number(minProfit)||0),minRoi:Math.max(0,Number(minRoi)||0),reservePct:Math.max(0,Number(reservePct)||5),createdAt:existing?.createdAt||now,updatedAt:now,triggered:false};
- if(existing)Object.assign(existing,value);else a.push(value);setAlerts(a);document.dispatchEvent(new Event('skinforge-alerts-change'));return value;
+ if(existing)Object.assign(existing,value);else a.push(value);setAlerts(a);document.dispatchEvent(new Event('skinforge-alerts-change'));trackEvent('profit_alert_add',{item_name:s.name});return value;
 }
 function removeAlert(id){setAlerts(alerts().filter(a=>a.id!==id));document.dispatchEvent(new Event('skinforge-alerts-change'))}
 function toast(msg){let t=$('#sfToast');if(!t){t=document.createElement('div');t.id='sfToast';t.className='sf-toast';document.body.appendChild(t)}t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4500)}
@@ -700,6 +705,8 @@ function renderCalculator(){const root=$('#calcRoot');if(!root)return;root.inner
 
 function renderNews(){let r=$('#newsGrid');if(r)r.innerHTML=NEWS.map(n=>`<article class="news-card"><div class="news-meta">${n.date} • ${n.tag}</div><h3>${n.title}</h3><p>${n.text}</p><a href="${n.url}" target="_blank">Открыть источник</a></article>`).join('')}
 document.addEventListener('DOMContentLoaded',()=>{
+  trackEvent('page_view');
+  document.addEventListener('click',e=>{const link=e.target.closest?.('a[target="_blank"]');if(!link)return;const row=link.closest('[data-buy-market],[data-market]'),market=row?.dataset.buyMarket||row?.dataset.market;if(market)trackEvent('market_outbound',{market,item_name:document.querySelector('#skinDetail h1')?.textContent||''})});
   setupMobileNav();setLoadingState();checkSystemStatus();
   renderHome();renderCatalog();renderSkin();renderNews();renderArbitrage();renderPortfolio();renderFavorites();renderAlerts();renderAnalytics();renderCalculator();renderDealRadar();updateLiveStatus();updateHeroSnapshot();
 
