@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Profit Scanner — AEROX</title>
+  <meta name="description" content="AEROX Profit Scanner — поиск потенциально прибыльных сделок со скинами CS2 по cash-ценам и реальным ордерам покупателей.">
+  <link rel="stylesheet" href="styles.css?v=207">
+  <link rel="stylesheet" href="aerox-global.css?v=207">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <style>
+    .scanner-hero{padding:42px 0 20px}.scanner-hero h1{font-size:clamp(34px,6vw,62px);margin:8px 0}.scanner-hero h1 span{color:#28c9ff}.scanner-hero p{max-width:780px;font-size:17px}.scanner-controls{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr)) auto;gap:12px;align-items:end;padding:18px}.scanner-controls label{display:grid;gap:7px;color:#8da9ba;font-size:12px;font-weight:800}.scanner-controls input,.scanner-controls select{width:100%;min-height:44px;padding:10px 12px;border:1px solid #1b4660;border-radius:11px;background:#07131e;color:#fff}.scanner-controls button{min-height:44px}.scanner-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.scanner-stat{padding:17px;border:1px solid #173e56;border-radius:15px;background:#081722}.scanner-stat span,.scanner-stat small{display:block;color:#7e9aad}.scanner-stat strong{display:block;margin:7px 0;font-size:25px}.scanner-tools{display:flex;gap:12px;justify-content:space-between;align-items:center;margin:18px 0}.scanner-tools input{width:min(390px,100%);min-height:43px;padding:10px 13px;border:1px solid #1b4660;border-radius:11px;background:#07131e;color:#fff}.scanner-list{display:grid;gap:11px}.profit-row{display:grid;grid-template-columns:minmax(230px,1.45fr) repeat(4,minmax(115px,.7fr)) 170px;gap:13px;align-items:center;padding:15px;border:1px solid #173e56;border-radius:16px;background:linear-gradient(135deg,#081721,#071019)}.profit-row:hover{border-color:#2587ae}.profit-skin{display:flex;align-items:center;gap:12px;min-width:0}.profit-skin img{width:78px;height:58px;object-fit:contain}.profit-skin div{min-width:0}.profit-skin strong,.profit-cell strong{display:block}.profit-skin strong{overflow:hidden;text-overflow:ellipsis}.profit-skin small,.profit-cell small{display:block;color:#7894a5;margin-top:4px}.profit-value{color:#59e99a;font-size:18px}.profit-actions{display:flex;gap:7px;flex-wrap:wrap}.profit-actions a{padding:9px 11px;font-size:12px}.scanner-warning{border-left:3px solid #ffbd4a}.scanner-loading{padding:42px;text-align:center}.scanner-loading strong{display:block;font-size:20px;margin-bottom:7px}.verified-pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #1f7350;background:#09291d;color:#62e7a0;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900}
+    @media(max-width:1080px){.scanner-controls{grid-template-columns:repeat(3,1fr)}.profit-row{grid-template-columns:minmax(220px,1.5fr) repeat(2,1fr)}.profit-actions{grid-column:2/4}.profit-cell.reserve-cell{display:none}}
+    @media(max-width:700px){.scanner-hero{padding-top:25px}.scanner-controls{grid-template-columns:1fr 1fr}.scanner-summary{grid-template-columns:1fr 1fr}.scanner-tools{align-items:stretch;flex-direction:column}.profit-row{grid-template-columns:1fr 1fr;padding:13px}.profit-skin{grid-column:1/3}.profit-actions{grid-column:1/3}.profit-skin img{width:68px}.scanner-controls button{grid-column:1/3}}
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="shell"><a class="logo" href="index.html">AERO<span>X</span></a><nav><a href="catalog.html">Рынки</a><a href="profit-scanner.html" class="active">Profit Scanner</a><a href="radar.html">Deal Radar</a><a href="analytics.html">Аналитика</a><a href="portfolio.html">Портфель</a></nav><div class="actions"><a class="ghost" href="methodology.html">Как считаем</a></div></div></header>
+  <main class="shell">
+    <section class="scanner-hero"><div class="eyebrow">AEROX VERIFIED CASH DEALS</div><h1>Сканер <span>прибыли</span></h1><p class="muted">Находит связку «купить дешевле → продать в реальный cash-ордер». Комиссия и резерв на изменение цены во время 7-дневной блокировки уже учитываются.</p></section>
+    <form id="scannerForm" class="panel scanner-controls">
+      <label>Прибыль от, $<input id="minProfit" type="number" min="0" max="100000" step="0.5" value="1"></label>
+      <label>ROI от, %<input id="minRoi" type="number" min="0" max="500" step="0.5" value="3"></label>
+      <label>Макс. покупка, $<input id="maxBuy" type="number" min="1" max="100000" step="10" value="1000"></label>
+      <label>Комиссия продажи, %<input id="sellFee" type="number" min="0" max="30" step="0.1" value="2"></label>
+      <label>Резерв на 7 дней, %<input id="reserve" type="number" min="0" max="50" step="0.5" value="5"></label>
+      <button class="primary" id="scanButton" type="submit">Сканировать рынок</button>
+    </form>
+    <div id="scannerSummary" class="scanner-summary" hidden></div>
+    <div class="scanner-tools"><input id="scannerSearch" type="search" placeholder="Найти скин в результатах…"><select id="scannerSort" aria-label="Сортировка"><option value="profit">Сначала прибыль</option><option value="roi">Сначала ROI</option><option value="price">Сначала дешёвые</option></select></div>
+    <div id="scannerStatus" class="panel scanner-loading"><strong>Проверяем cash-предложения…</strong><span class="muted">Сопоставляем цены и реальные ордера покупателей.</span></div>
+    <section id="scannerResults" class="scanner-list"></section>
+    <p class="notice scanner-warning">Это расчёт по ценам и ордерам на момент сканирования, а не гарантия дохода. После получения предмета может действовать 7-дневная торговая блокировка; за это время цена и ордер покупателя могут измениться.</p>
+  </main>
+  <footer class="footer">AEROX Profit Scanner • только cash-данные • Trade Lock aware</footer>
+  <script src="cloud.js?v=207"></script>
+  <script src="profit-scanner.js?v=207"></script>
+</body>
+</html>
