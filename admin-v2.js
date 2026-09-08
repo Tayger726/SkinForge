@@ -1,7 +1,7 @@
 (()=>{
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function request(url,opt={}){const r=await fetch(url,{credentials:'same-origin',...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}}),d=await r.json();if(!r.ok)throw Error(d.error||'Ошибка');return d}
-const names={page_view:'Просмотры страниц',skin_view:'Открытия скинов',market_outbound:'Переходы на маркеты',favorite_add:'Добавления в избранное',portfolio_add:'Добавления в портфель',price_alert_add:'Ценовые уведомления',profit_alert_add:'Умные уведомления',price_report_open:'Открытия формы цены',price_report_submit:'Отправленные ошибки цен',pro_interest:'Интерес к PRO'};
+const names={page_view:'Просмотры страниц',skin_view:'Открытия скинов',market_outbound:'Переходы на маркеты',favorite_add:'Добавления в избранное',portfolio_add:'Добавления в портфель',price_alert_add:'Ценовые уведомления',profit_alert_add:'Умные уведомления',price_report_open:'Открытия формы цены',price_report_submit:'Отправленные ошибки цен',pro_interest:'Интерес к PRO',profit_scanner_run:'Запуски Profit Scanner'};
 function setup(){
  const grid=document.querySelector('.admin-grid'),layout=document.querySelector('.admin-layout');if(!grid||!layout)return;
  grid.insertAdjacentHTML('beforeend','<div class="stat"><span class="muted">Посетители 7д</span><b id="sVisitors">—</b></div><div class="stat"><span class="muted">Действия 7д</span><b id="sEvents">—</b></div><div class="stat"><span class="muted">Переходы в маркеты</span><b id="sOutbound">—</b></div><div class="stat"><span class="muted">Заявки PRO</span><b id="sProLeads">—</b></div><div class="stat"><span class="muted">Ошибки цен</span><b id="sReports">—</b></div>');
